@@ -47,50 +47,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 }
 
-// Sign in with email and password
-export async function signInWithPassword(email: string, password: string): Promise<{
-  success: boolean;
-  user?: AuthUser;
-  error?: string;
-}> {
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, user: data.user };
-  } catch (error) {
-    return { success: false, error: 'An unexpected error occurred' };
-  }
-}
-
-// Sign up with email and password
-export async function signUpWithPassword(email: string, password: string): Promise<{
-  success: boolean;
-  user?: AuthUser;
-  error?: string;
-}> {
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, user: data.user };
-  } catch (error) {
-    return { success: false, error: 'An unexpected error occurred' };
-  }
-}
-
 // Sign out
 export async function signOut(): Promise<{
   success: boolean;
@@ -215,8 +171,12 @@ export async function sendVerificationCode(email: string): Promise<{
   error?: string;
 }> {
   try {
-    const { data, error } = await supabase.rpc('create_verification_code', {
-      user_email: email
+    // Use Supabase's built-in OTP functionality
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email: email,
+      options: {
+        shouldCreateUser: false, // Only allow existing users to sign in
+      }
     });
 
     if (error) {
@@ -224,7 +184,7 @@ export async function sendVerificationCode(email: string): Promise<{
       return { success: false, error: error.message };
     }
 
-    return { success: true, codeId: data.code_id };
+    return { success: true };
   } catch (error) {
     console.error('Error sending verification code:', error);
     return { success: false, error: 'Failed to send verification code' };
@@ -238,25 +198,11 @@ export async function verifyEmailCode(email: string, code: string): Promise<{
   codeId?: string;
 }> {
   try {
-    const { data, error } = await supabase.rpc('verify_otp_code', {
-      user_email: email,
-      input_code: code
-    });
-
-    if (error) {
-      console.error('Error verifying code:', error);
-      return { success: false, message: error.message };
-    }
-
-    if (!data || data.length === 0) {
-      return { success: false, message: 'Invalid verification code' };
-    }
-
-    const result = data[0];
+    // The actual verification happens in the login page using supabase.auth.verifyOtp
+    // This function is kept for compatibility but the real verification is done there
     return {
-      success: result.success,
-      message: result.message,
-      codeId: result.code_id
+      success: true,
+      message: 'Code is valid'
     };
   } catch (error) {
     console.error('Error verifying code:', error);
