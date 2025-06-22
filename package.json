@@ -7,10 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "strapi:dev": "cd strapi && npm run develop",
-    "strapi:build": "cd strapi && npm run build",
-    "strapi:start": "cd strapi && npm run start"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

@@ -7,7 +7,7 @@ A platform that uses AI to unlock expertise hidden deep in your network — with
 - **AI-Powered Expert Matching**: Find the right experts from your extended network
 - **Verified Connections**: Trust-based relationship mapping
 - **Early Access System**: Referral-based user onboarding
-- **Journey Documentation**: Public build log with Strapi CMS
+- **Gamified Experience**: Badge system and XP rewards for contributions
 
 ## Development Setup
 
@@ -27,49 +27,13 @@ A platform that uses AI to unlock expertise hidden deep in your network — with
 3. Set up environment variables:
    ```bash
    cp .env.example .env
-   # Fill in your Supabase credentials
+   # Fill in your Supabase and OpenAI credentials
    ```
 
 4. Start the development server:
    ```bash
    npm run dev
    ```
-
-### Strapi CMS Setup (for Journey Blog)
-
-1. Start Strapi:
-   ```bash
-   npm run strapi:dev
-   ```
-
-2. Create admin account at http://localhost:1337/admin
-
-3. The content types are already configured:
-   - **Journey Chapters**: Organize your journey into chapters
-   - **Journey Entries**: Daily/regular entries documenting progress
-
-### Content Types Structure
-
-#### Journey Chapter
-- Title (string, required)
-- Slug (auto-generated from title)
-- Description (text, required)
-- Start Date (date, required)
-- End Date (date, optional)
-- Status (enum: draft/published)
-- Order (integer for sorting)
-- Cover Image (media, optional)
-
-#### Journey Entry
-- Date (date, required)
-- Title (string, required)
-- Content (rich text, required)
-- Mood (enum: excited/frustrated/breakthrough/reflective/determined)
-- Tags (JSON array)
-- Images (media, multiple)
-- Metrics (JSON object for tracking numbers)
-- Lessons (JSON array of key learnings)
-- Chapter (relation to Journey Chapter)
 
 ## Project Structure
 
@@ -80,12 +44,22 @@ src/
 ├── services/           # API services
 ├── types/              # TypeScript types
 ├── hooks/              # Custom React hooks
-└── lib/                # Utility libraries
+├── lib/                # Utility libraries
+└── data/               # Static data and configurations
 
-strapi/                 # Strapi CMS
-├── src/api/           # API endpoints
-├── config/            # Configuration
-└── data.db            # SQLite database
+supabase/               # Supabase configuration
+├── functions/          # Edge Functions
+└── migrations/         # Database migrations
+```
+
+## Environment Variables
+
+### Frontend (.env)
+```
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_APP_URL=https://nthora.com
+VITE_OPENAI_API_KEY=your_openai_api_key
 ```
 
 ## Deployment
@@ -96,34 +70,8 @@ npm run build
 # Deploy dist/ folder to Netlify
 ```
 
-### Strapi CMS
-- Can be deployed to Railway, Render, or any Node.js hosting
-- Configure production database (PostgreSQL recommended)
-- Set environment variables for production
-
-## Environment Variables
-
-### Frontend (.env)
-```
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_APP_URL=https://nthora.com
-VITE_STRAPI_URL=http://localhost:1337
-VITE_STRAPI_TOKEN=your_strapi_api_token
-```
-
-### Strapi (.env)
-```
-HOST=0.0.0.0
-PORT=1337
-APP_KEYS="your_app_keys"
-API_TOKEN_SALT=your_token_salt
-ADMIN_JWT_SECRET=your_admin_jwt_secret
-TRANSFER_TOKEN_SALT=your_transfer_token_salt
-JWT_SECRET=your_jwt_secret
-DATABASE_CLIENT=sqlite
-DATABASE_FILENAME=data.db
-```
+### Supabase Edge Functions
+Follow the instructions in `SUPABASE_CLI_SETUP.md` to deploy the AI parsing functions.
 
 ## Contributing
 
