@@ -18,6 +18,7 @@ export interface UserProfile {
   invited_by?: string;
   invite_code_used?: string;
   approved_at?: string;
+  onboarding_details?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
@@ -131,6 +132,7 @@ export async function createUserProfile(profileData: {
   expertise_areas: string[];
   invited_by?: string;
   invite_code_used?: string;
+  onboarding_details?: Record<string, any>;
 }): Promise<{
   success: boolean;
   profile?: UserProfile;
