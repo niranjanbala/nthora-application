@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, AlertCircle, Users, ArrowRight, Mail, Key, User } from 'lucide-react';
 import { validateInviteCode, registerWithInvite } from '../../services/membershipService';
 import { getEarlyUserByEmail } from '../../services/earlyUserService';
-import { sendVerificationCode, verifyEmailCode } from '../../services/authService';
+import { sendOtpCode, verifyOtpAndSignIn } from '../../services/authService';
 
 const InviteRegistration: React.FC = () => {
   const { inviteCode: urlInviteCode } = useParams<{ inviteCode?: string }>();
@@ -63,7 +63,7 @@ const InviteRegistration: React.FC = () => {
         setEarlyUserData(earlyUser);
         
         // Send verification code
-        const result = await sendVerificationCode(email);
+        const result = await sendOtpCode(email);
         if (result.success) {
           setCurrentStage('early_user_otp');
         } else {
@@ -91,7 +91,7 @@ const InviteRegistration: React.FC = () => {
     setError(null);
 
     try {
-      const result = await verifyEmailCode(email, otpCode);
+      const result = await verifyOtpAndSignIn(email, otpCode);
       
       if (result.success) {
         // OTP verified successfully, proceed to onboarding with early user data
@@ -102,7 +102,7 @@ const InviteRegistration: React.FC = () => {
           }
         });
       } else {
-        setError(result.message || 'Invalid verification code');
+        setError(result.error || 'Invalid verification code');
       }
     } catch (error) {
       console.error('Error verifying OTP:', error);

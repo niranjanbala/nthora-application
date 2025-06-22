@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, AlertCircle, Network, ArrowRight, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { sendVerificationCode, verifyEmailCode } from '../services/authService';
+import { sendOtpCode, verifyOtpAndSignIn } from '../services/authService';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      const result = await sendVerificationCode(email);
+      const result = await sendOtpCode(email);
       
       if (result.success) {
         setLoginStage('otp_input');
@@ -49,38 +49,41 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      const result = await verifyEmailCode(email, otpCode);
+      const result = await verifyOtpAndSignIn(email, otpCode);
       
-      if (result.success) {
-        // OTP verified successfully - now sign in with OTP
-        const { data, error } = await supabase.auth.verifyOtp({
-          email,
-          token: otpCode,
-          type: 'email'
-        });
+      if (result.success && result.user) {
+        // Check if user has a profile
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', result.user.id)
+          .single();
 
-        if (error) {
-          setError(error.message);
-          return;
-        }
-
-        if (data.user) {
-          // Check if user has a profile
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-          if (profile) {
-            navigate('/dashboard');
-          } else {
-            // User exists but no profile - redirect to onboarding
-            navigate('/onboarding');
-          }
+        if (profile) {
+          navigate('/dashboard');
+        } else {
+          // User exists but no profile - redirect to onboarding
+          navigate('/onboarding');
         }
       } else {
-        setError(result.message || 'Invalid verification code');
+        setError(result.error || 'Invalid verification code');
+      }
+    } catch (error) {
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await sendOtpCode(email);
+      
+      if (!result.success) {
+        setError(result.error || 'Failed to resend verification code');
       }
     } catch (error) {
       setError('An unexpected error occurred. Please try again.');
@@ -217,7 +220,7 @@ const LoginPage: React.FC = () => {
           
           <div>
             <button
-              onClick={() => handleEmailSubmit({ preventDefault: () => {} } as React.FormEvent)}
+              onClick={handleResendCode}
               disabled={loading}
               className="text-gray-600 hover:text-gray-800 text-sm"
             >

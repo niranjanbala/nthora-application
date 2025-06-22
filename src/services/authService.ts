@@ -164,15 +164,14 @@ export async function createUserProfile(profileData: {
   }
 }
 
-// Send verification code to user's email
-export async function sendVerificationCode(email: string): Promise<{
+// Send OTP code to user's email
+export async function sendOtpCode(email: string): Promise<{
   success: boolean;
-  codeId?: string;
   error?: string;
 }> {
   try {
     // Use Supabase's built-in OTP functionality
-    const { data, error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email: email,
       options: {
         shouldCreateUser: false, // Only allow existing users to sign in
@@ -180,33 +179,42 @@ export async function sendVerificationCode(email: string): Promise<{
     });
 
     if (error) {
-      console.error('Error sending verification code:', error);
+      console.error('Error sending OTP code:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
-    console.error('Error sending verification code:', error);
+    console.error('Error sending OTP code:', error);
     return { success: false, error: 'Failed to send verification code' };
   }
 }
 
-// Verify OTP code
-export async function verifyEmailCode(email: string, code: string): Promise<{
+// Verify OTP and sign in
+export async function verifyOtpAndSignIn(email: string, token: string): Promise<{
   success: boolean;
-  message: string;
-  codeId?: string;
+  user?: AuthUser;
+  error?: string;
 }> {
   try {
-    // The actual verification happens in the login page using supabase.auth.verifyOtp
-    // This function is kept for compatibility but the real verification is done there
-    return {
-      success: true,
-      message: 'Code is valid'
-    };
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email'
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (!data.user) {
+      return { success: false, error: 'Authentication failed' };
+    }
+
+    return { success: true, user: data.user };
   } catch (error) {
-    console.error('Error verifying code:', error);
-    return { success: false, message: 'Failed to verify code' };
+    console.error('Error verifying OTP:', error);
+    return { success: false, error: 'Failed to verify code' };
   }
 }
 
