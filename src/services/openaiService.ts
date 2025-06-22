@@ -233,6 +233,72 @@ Respond in JSON format:
     }
   }
 
+  async parseIndustry(text: string): Promise<{
+    primaryIndustries: string[];
+    secondaryIndustries: string[];
+    businessModel: string[];
+    companyStage: string[];
+    suggestedIndustries: string[];
+    confidence: number;
+  }> {
+    const prompt = `
+Analyze the following text describing an industry, company, or business context and extract:
+
+1. Primary industries (1-3 main industry categories)
+2. Secondary industries (1-3 related or supporting industries)
+3. Business model (subscription, marketplace, b2b, b2c, enterprise, services, etc.)
+4. Company stage (startup, growth stage, public company, enterprise, etc.)
+5. Suggested related industries (3-5 industries that might be relevant)
+6. Confidence score (0.0-1.0 based on clarity and specificity)
+
+Text: "${text}"
+
+Respond in JSON format:
+{
+  "primaryIndustries": ["SaaS", "Fintech"],
+  "secondaryIndustries": ["Enterprise Software"],
+  "businessModel": ["Subscription", "B2B"],
+  "companyStage": ["Startup"],
+  "suggestedIndustries": ["Cloud Computing", "Financial Services", "Banking"],
+  "confidence": 0.85
+}`;
+
+    const response = await this.makeRequest('/chat/completions', {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert at analyzing business contexts and industry classifications. Extract accurate industry information from descriptions.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 500,
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    try {
+      const content = response.data.choices[0].message.content;
+      const parsed = JSON.parse(content);
+      return {
+        primaryIndustries: parsed.primaryIndustries || [],
+        secondaryIndustries: parsed.secondaryIndustries || [],
+        businessModel: parsed.businessModel || [],
+        companyStage: parsed.companyStage || [],
+        suggestedIndustries: parsed.suggestedIndustries || [],
+        confidence: parsed.confidence || 0.5,
+      };
+    } catch (error) {
+      throw new Error('Failed to parse OpenAI response');
+    }
+  }
+
   async analyzeQuestion(title: string, content: string): Promise<{
     primaryTags: string[];
     secondaryTags: string[];
@@ -330,6 +396,18 @@ export class SecureOpenAIService {
 
   async parseRoleSecure(text: string) {
     const { data, error } = await supabase.functions.invoke('parse-role', {
+      body: { text }
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  async parseIndustrySecure(text: string) {
+    const { data, error } = await supabase.functions.invoke('parse-industry', {
       body: { text }
     });
 

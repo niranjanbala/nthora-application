@@ -80,11 +80,14 @@ export async function parseIndustryText(text: string): Promise<ParsedIndustry> {
   }
   
   try {
-    // For now, use mock implementation for industry parsing
-    // You can extend the OpenAI service to include industry parsing
-    return mockIndustryResponse(text);
+    if (USE_SECURE_API) {
+      return await secureOpenaiService.parseIndustrySecure(text);
+    } else {
+      return await openaiService.parseIndustry(text);
+    }
   } catch (error) {
     console.error('Error parsing industry:', error);
+    // Fallback to mock implementation
     return mockIndustryResponse(text);
   }
 }
