@@ -96,6 +96,12 @@ npx supabase functions deploy parse-expertise
 # Deploy the help topics parsing function
 npx supabase functions deploy parse-help-topics
 
+# Deploy the role parsing function
+npx supabase functions deploy parse-role
+
+# Deploy the industry parsing function
+npx supabase functions deploy parse-industry
+
 # Deploy the question analysis function
 npx supabase functions deploy analyze-question
 ```
@@ -109,6 +115,12 @@ npx supabase functions invoke parse-expertise --data '{"text":"I am a senior pro
 
 # Test the parse-help-topics function
 npx supabase functions invoke parse-help-topics --data '{"text":"I need help with fundraising and scaling my engineering team"}'
+
+# Test the parse-role function
+npx supabase functions invoke parse-role --data '{"text":"I am a senior product manager at a fintech startup"}'
+
+# Test the parse-industry function
+npx supabase functions invoke parse-industry --data '{"text":"We are a B2B SaaS company in the fintech space"}'
 
 # Test the analyze-question function
 npx supabase functions invoke analyze-question --data '{"title":"How to scale engineering team?","content":"We are growing fast and need to hire more engineers"}'
@@ -128,6 +140,7 @@ You can add these to your `package.json` for convenience:
     "supabase:login": "supabase login",
     "supabase:link": "supabase link",
     "supabase:deploy": "supabase functions deploy",
+    "supabase:deploy-all": "supabase functions deploy parse-expertise && supabase functions deploy parse-help-topics && supabase functions deploy parse-role && supabase functions deploy parse-industry && supabase functions deploy analyze-question",
     "supabase:secrets": "supabase secrets list"
   }
 }
@@ -137,6 +150,7 @@ Then use them like:
 ```bash
 npm run supabase:login
 npm run supabase:deploy parse-expertise
+npm run supabase:deploy-all
 ```
 
 ## Troubleshooting
@@ -165,6 +179,10 @@ supabase/
 │   ├── parse-expertise/
 │   │   └── index.ts
 │   ├── parse-help-topics/
+│   │   └── index.ts
+│   ├── parse-role/
+│   │   └── index.ts
+│   ├── parse-industry/
 │   │   └── index.ts
 │   └── analyze-question/
 │       └── index.ts
@@ -196,6 +214,8 @@ npx supabase secrets set OPENAI_API_KEY=your_openai_api_key_here
 # 4. Deploy all functions
 npx supabase functions deploy parse-expertise
 npx supabase functions deploy parse-help-topics
+npx supabase functions deploy parse-role
+npx supabase functions deploy parse-industry
 npx supabase functions deploy analyze-question
 
 # 5. Test a function
