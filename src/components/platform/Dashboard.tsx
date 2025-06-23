@@ -14,6 +14,8 @@ import BadgeShowcase from '../badges/BadgeShowcase';
 import { BadgeService } from '../../services/badgeService';
 import UserNetworkBadges from '../profile/UserNetworkBadges';
 import NetworkDepthBadges from '../badges/NetworkDepthBadges';
+import NetworkActivityFeed from '../network/NetworkActivityFeed';
+import AutoDetectedSkills from '../network/AutoDetectedSkills';
 
 type DashboardView = 
   | 'feed' 
@@ -28,7 +30,9 @@ type DashboardView =
   | 'badges'
   | 'profile'
   | 'network_badges'
-  | 'network_depth';
+  | 'network_depth'
+  | 'network_activity'
+  | 'auto_skills';
 
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -56,6 +60,8 @@ const Dashboard: React.FC = () => {
     { id: 'my_questions', label: 'My Questions', icon: MessageSquare, badge: null, description: 'Questions you\'ve asked' },
     { id: 'matched_questions', label: 'Answer Questions', icon: Users, badge: 2, description: 'Questions matched to your expertise' },
     { id: 'expertise', label: 'My Expertise', icon: Star, badge: null, description: 'Manage your knowledge areas' },
+    { id: 'auto_skills', label: 'Auto-Detected Skills', icon: Sparkles, badge: 3, description: 'Skills inferred from your answers' },
+    { id: 'network_activity', label: 'Network Activity', icon: Zap, badge: null, description: 'Questions and answers from your network' },
     { id: 'network', label: 'Network', icon: Users, badge: null, description: 'Explore your extended network' },
     { id: 'endorsements', label: 'Endorsements', icon: Star, badge: null, description: 'Peer validation of your skills' },
     { id: 'badges', label: 'Badges', icon: Trophy, badge: BadgeService.getRecentlyEarnedBadges().length, description: 'Your achievements and recognition' },
@@ -78,6 +84,10 @@ const Dashboard: React.FC = () => {
         return <QuestionFeed view="matched_questions" />;
       case 'expertise':
         return <ExpertiseManager />;
+      case 'auto_skills':
+        return <AutoDetectedSkills onSkillsUpdated={() => handleViewChange('auto_skills')} />;
+      case 'network_activity':
+        return <NetworkActivityFeed maxDegree={2} limit={50} />;
       case 'network':
         return <NetworkVisualization />;
       case 'endorsements':
