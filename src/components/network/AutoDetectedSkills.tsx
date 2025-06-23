@@ -311,5 +311,3 @@ const AutoDetectedSkills: React.FC<AutoDetectedSkillsProps> = ({ onSkillsUpdated
 };
 
 export default AutoDetectedSkills;
-
-export default AutoDetectedSkills
