@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { User, Mail, MapPin, Calendar, Edit, Settings, Trophy, Users, Star, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Mail, MapPin, Calendar, Edit, Settings, Trophy, Users, Star, MessageSquare, Sparkles, Zap, Network } from 'lucide-react';
 import { BadgeService } from '../../services/badgeService';
 import ProfileBadges from '../badges/ProfileBadges';
 import BadgeShowcase from '../badges/BadgeShowcase';
 import BadgeDisplay from "../badges/BadgeDisplay";
 import NetworkDepthBadges from '../badges/NetworkDepthBadges';
+import { getUserProfile } from '../../services/authService';
+import { getUserExpertise } from '../../services/questionRoutingService';
+import { getAutoDetectedSkills, getNetworkActivityFeed } from '../../services/networkService';
 
 interface UserProfileProps {
   userId?: string;
@@ -16,9 +19,43 @@ const UserProfile: React.FC<UserProfileProps> = ({
   isOwnProfile = true
 }) => {
   const [showAllBadges, setShowAllBadges] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userExpertise, setUserExpertise] = useState<any[]>([]);
+  const [autoDetectedSkills, setAutoDetectedSkills] = useState<any[]>([]);
+  const [networkActivity, setNetworkActivity] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  // Mock user data - in production would fetch from API
-  const user = {
+  useEffect(() => {
+    loadUserData();
+  }, [userId]);
+
+  const loadUserData = async () => {
+    setLoading(true);
+    try {
+      // Load user profile
+      const profile = await getUserProfile(userId);
+      setUserProfile(profile);
+
+      // Load user expertise
+      const expertise = await getUserExpertise(userId);
+      setUserExpertise(expertise);
+
+      // Load auto-detected skills
+      const skills = await getAutoDetectedSkills();
+      setAutoDetectedSkills(skills);
+
+      // Load network activity
+      const activity = await getNetworkActivityFeed(2, 10);
+      setNetworkActivity(activity);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Mock user data as fallback if API calls fail
+  const user = userProfile || {
     id: userId || 'current-user',
     name: 'Sarah Chen',
     email: 'sarah@example.com',
@@ -41,6 +78,49 @@ const UserProfile: React.FC<UserProfileProps> = ({
   const badgeStats = BadgeService.getUserBadgeStats();
   const networkDepthBadges = BadgeService.getNetworkDepthBadges();
 
+  // Process network activity data for summary
+  const networkActivitySummary = {
+    totalQuestions: networkActivity.filter(a => a.activity_type === 'question').length,
+    totalAnswers: networkActivity.filter(a => a.activity_type === 'response').length,
+    uniqueContributors: new Set(networkActivity.map(a => a.user_id)).size,
+    topTags: getTopTags(networkActivity),
+    recentActivity: networkActivity.slice(0, 3)
+  };
+
+  // Helper function to extract top tags from network activity
+  function getTopTags(activities: any[]) {
+    const tagCounts: Record<string, number> = {};
+    
+    activities.forEach(activity => {
+      if (activity.tags && activity.tags.length) {
+        activity.tags.forEach((tag: string) => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        });
+      }
+    });
+    
+    return Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([tag]) => tag);
+  }
+
+  // Get confidence color for auto-detected skills
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return 'text-green-600 bg-green-100';
+    if (confidence >= 0.6) return 'text-yellow-600 bg-yellow-100';
+    if (confidence >= 0.4) return 'text-blue-600 bg-blue-100';
+    return 'text-gray-600 bg-gray-100';
+  };
+
+  // Get confidence label for auto-detected skills
+  const getConfidenceLabel = (confidence: number) => {
+    if (confidence >= 0.8) return 'High';
+    if (confidence >= 0.6) return 'Medium';
+    if (confidence >= 0.4) return 'Low';
+    return 'Very Low';
+  };
+
   return (
     <div className="space-y-6">
       {/* Profile Header */}
@@ -48,11 +128,11 @@ const UserProfile: React.FC<UserProfileProps> = ({
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center space-x-4">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              {user.name.charAt(0)}
+              {userProfile?.full_name ? userProfile.full_name.charAt(0) : user.name.charAt(0)}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
-              <p className="text-gray-600">{user.role} at {user.company}</p>
+              <h1 className="text-2xl font-bold text-gray-900">{userProfile?.full_name || user.name}</h1>
+              <p className="text-gray-600">{userProfile?.role || user.role} {userProfile?.company || user.company ? `at ${userProfile?.company || user.company}` : ''}</p>
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
                 <div className="flex items-center space-x-1">
                   <MapPin className="h-4 w-4" />
@@ -60,7 +140,7 @@ const UserProfile: React.FC<UserProfileProps> = ({
                 </div>
                 <div className="flex items-center space-x-1">
                   <Calendar className="h-4 w-4" />
-                  <span>Joined {new Date(user.joinedDate).toLocaleDateString()}</span>
+                  <span>Joined {new Date(userProfile?.created_at || user.joinedDate).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
@@ -74,14 +154,14 @@ const UserProfile: React.FC<UserProfileProps> = ({
         </div>
 
         <div className="mb-6">
-          <p className="text-gray-700 leading-relaxed">{user.bio}</p>
+          <p className="text-gray-700 leading-relaxed">{userProfile?.bio || user.bio}</p>
         </div>
 
         {/* Expertise Tags */}
         <div className="mb-6">
           <h3 className="text-sm font-medium text-gray-700 mb-2">Expertise</h3>
           <div className="flex flex-wrap gap-2">
-            {user.expertise.map((skill, index) => (
+            {(userProfile?.expertise_areas || userExpertise.map(e => e.expertise_tag) || user.expertise).map((skill: string, index: number) => (
               <span
                 key={index}
                 className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm"
@@ -123,6 +203,162 @@ const UserProfile: React.FC<UserProfileProps> = ({
             <div className="text-xs text-gray-600">Network Size</div>
           </div>
         </div>
+      </div>
+
+      {/* Auto-Detected Skills Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Auto-Detected Skills</h2>
+            <p className="text-gray-600">Skills inferred from your high-quality answers</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Sparkles className="h-5 w-5 text-purple-600" />
+            <span className="font-bold text-gray-900">{autoDetectedSkills.filter(s => !s.is_user_added).length}</span>
+            <span className="text-gray-600">detected</span>
+          </div>
+        </div>
+
+        {autoDetectedSkills.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <Sparkles className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <p>No auto-detected skills yet</p>
+            <p className="text-sm">Start answering questions to build your skill profile</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {autoDetectedSkills.slice(0, 6).map((skill) => (
+              <div
+                key={skill.skill}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow duration-300"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-gray-900">{skill.skill}</h3>
+                  {!skill.is_user_added && (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(skill.confidence)}`}>
+                      {getConfidenceLabel(skill.confidence)}
+                    </span>
+                  )}
+                </div>
+                
+                {!skill.is_user_added && (
+                  <>
+                    <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
+                      <MessageSquare className="h-3 w-3" />
+                      <span>{skill.questions_answered} answers</span>
+                      <ThumbsUp className="h-3 w-3 ml-2" />
+                      <span>{skill.helpful_votes} helpful</span>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className="bg-purple-600 h-1.5 rounded-full"
+                        style={{ width: `${skill.confidence * 100}%` }}
+                      ></div>
+                    </div>
+                  </>
+                )}
+                
+                {skill.is_user_added && (
+                  <div className="flex items-center space-x-1 text-sm text-blue-600">
+                    <User className="h-3 w-3" />
+                    <span>User added</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {autoDetectedSkills.length > 6 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => window.location.href = '/dashboard?view=auto_skills'}
+              className="text-purple-600 hover:text-purple-700 font-medium text-sm"
+            >
+              View all {autoDetectedSkills.length} skills
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Network Activity Summary */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Network Activity</h2>
+            <p className="text-gray-600">Recent activity from your extended network</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Network className="h-5 w-5 text-purple-600" />
+            <span className="font-bold text-gray-900">{networkActivitySummary.uniqueContributors}</span>
+            <span className="text-gray-600">contributors</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+            <div className="text-lg font-semibold text-purple-600 mb-1">{networkActivitySummary.totalQuestions}</div>
+            <div className="text-sm text-gray-600">Questions</div>
+          </div>
+          <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+            <div className="text-lg font-semibold text-indigo-600 mb-1">{networkActivitySummary.totalAnswers}</div>
+            <div className="text-sm text-gray-600">Answers</div>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="text-lg font-semibold text-blue-600 mb-1">{networkActivitySummary.topTags.length}</div>
+            <div className="text-sm text-gray-600">Active Topics</div>
+          </div>
+        </div>
+
+        {/* Top Tags */}
+        {networkActivitySummary.topTags.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Top Topics in Your Network</h3>
+            <div className="flex flex-wrap gap-2">
+              {networkActivitySummary.topTags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Activity Preview */}
+        {networkActivitySummary.recentActivity.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Recent Network Activity</h3>
+            <div className="space-y-3">
+              {networkActivitySummary.recentActivity.map((activity, index) => (
+                <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <div className="w-6 h-6 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center">
+                      <User className="h-3 w-3 text-purple-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">{activity.user_name}</span>
+                    <span className="text-xs text-gray-500">
+                      {activity.activity_type === 'question' ? 'asked' : 'answered'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 line-clamp-1">{activity.title}</p>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => window.location.href = '/dashboard?view=network_activity'}
+                className="text-purple-600 hover:text-purple-700 font-medium text-sm"
+              >
+                View all network activity
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Network Depth Badges Section */}
