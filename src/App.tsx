@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './components/platform/Dashboard';
+import QuestionDetail from './components/questions/QuestionDetail';
 import InviteRegistration from './components/membership/InviteRegistration';
 import Onboarding from './pages/Onboarding';
 
@@ -22,6 +23,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/questions/:questionId" 
+            element={
+              <ProtectedRoute>
+                <QuestionDetail />
               </ProtectedRoute>
             } 
           />

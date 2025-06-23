@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Clock, Users, ArrowRight, Tag, AlertTriangle, Lock } from 'lucide-react';
-import { getUserQuestions, getMatchedQuestions, type Question } from '../../services/questionRoutingService';
+import { useNavigate } from 'react-router-dom';
+import { MessageSquare, Clock, Users, ArrowRight, Tag, AlertTriangle, Lock, Plus } from 'lucide-react';
+import { 
+  getUserQuestions, 
+  getMatchedQuestions, 
+  getAllQuestions,
+  type Question 
+} from '../../services/questionRoutingService';
 
 interface QuestionFeedProps {
   view: 'my_questions' | 'matched_questions' | 'all';
 }
 
 const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuestions();
@@ -23,8 +29,10 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
       if (view === 'matched_questions') {
         const matchedQuestions = await getMatchedQuestions();
         data = matchedQuestions;
-      } else {
+      } else if (view === 'my_questions') {
         data = await getUserQuestions();
+      } else {
+        data = await getAllQuestions();
       }
       
       setQuestions(data);
@@ -33,6 +41,10 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQuestionClick = (questionId: string) => {
+    navigate(`/questions/${questionId}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -75,6 +87,57 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
     }
   };
 
+  const getViewTitle = () => {
+    switch (view) {
+      case 'my_questions': return 'My Questions';
+      case 'matched_questions': return 'Questions for You';
+      case 'all': return 'All Questions';
+      default: return 'Questions';
+    }
+  };
+
+  const getViewDescription = () => {
+    switch (view) {
+      case 'my_questions': return 'Questions you\'ve asked';
+      case 'matched_questions': return 'Questions matched to your expertise';
+      case 'all': return 'Recent questions from the community';
+      default: return 'Browse questions';
+    }
+  };
+
+  const getEmptyStateMessage = () => {
+    switch (view) {
+      case 'my_questions': 
+        return {
+          title: 'No questions yet',
+          description: 'Start by asking your first question to get expert answers',
+          action: 'Ask Question',
+          actionHandler: () => navigate('/dashboard?view=ask_question')
+        };
+      case 'matched_questions':
+        return {
+          title: 'No questions matched to you yet',
+          description: 'Questions that match your expertise will appear here',
+          action: null,
+          actionHandler: null
+        };
+      case 'all':
+        return {
+          title: 'No questions available',
+          description: 'Be the first to ask a question in the community',
+          action: 'Ask Question',
+          actionHandler: () => navigate('/dashboard?view=ask_question')
+        };
+      default:
+        return {
+          title: 'No questions found',
+          description: 'Try adjusting your filters or check back later',
+          action: null,
+          actionHandler: null
+        };
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -90,132 +153,155 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
   }
 
   if (questions.length === 0) {
+    const emptyState = getEmptyStateMessage();
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
         <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          {view === 'matched_questions' ? 'No questions matched to you yet' : 'No questions yet'}
-        </h3>
-        <p className="text-gray-600">
-          {view === 'matched_questions' 
-            ? 'Questions that match your expertise will appear here'
-            : 'Start by asking your first question to get expert answers'
-          }
-        </p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyState.title}</h3>
+        <p className="text-gray-600 mb-6">{emptyState.description}</p>
+        {emptyState.action && emptyState.actionHandler && (
+          <button
+            onClick={emptyState.actionHandler}
+            className="inline-flex items-center space-x-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors duration-300"
+          >
+            <Plus className="h-5 w-5" />
+            <span>{emptyState.action}</span>
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {questions.map((question) => (
-        <div
-          key={question.id}
-          className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-300"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-2">
-                <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-                  {question.title}
-                </h3>
-                {question.is_sensitive && (
-                  <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">{getViewTitle()}</h2>
+          <p className="text-gray-600">{getViewDescription()}</p>
+        </div>
+        <div className="text-sm text-gray-500">
+          {questions.length} question{questions.length !== 1 ? 's' : ''}
+        </div>
+      </div>
+
+      {/* Questions List */}
+      <div className="space-y-4">
+        {questions.map((question) => (
+          <div
+            key={question.id}
+            onClick={() => handleQuestionClick(question.id)}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-200 transition-all duration-300 cursor-pointer"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 hover:text-purple-600 transition-colors duration-300">
+                    {question.title}
+                  </h3>
+                  {question.is_sensitive && (
+                    <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                  )}
+                </div>
+                
+                <p className="text-gray-700 line-clamp-3 mb-3">
+                  {question.content}
+                </p>
+                
+                {/* Tags */}
+                {(question.primary_tags.length > 0 || question.secondary_tags.length > 0) && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {question.primary_tags.slice(0, 3).map((tag, index) => (
+                      <span
+                        key={index}
+                        className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {question.secondary_tags.slice(0, 2).map((tag, index) => (
+                      <span
+                        key={index}
+                        className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {(question.primary_tags.length + question.secondary_tags.length) > 5 && (
+                      <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs">
+                        +{(question.primary_tags.length + question.secondary_tags.length) - 5} more
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
               
-              <p className="text-gray-700 line-clamp-3 mb-3">
-                {question.content}
-              </p>
-              
-              {/* Tags */}
-              {(question.primary_tags.length > 0 || question.secondary_tags.length > 0) && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {question.primary_tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  {question.secondary_tags.slice(0, 3).map((tag, index) => (
-                    <span
-                      key={index}
-                      className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+              <div className="flex flex-col items-end space-y-2 ml-4">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(question.status)}`}>
+                  {question.status}
+                </span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(question.urgency_level)}`}>
+                  {question.urgency_level}
+                </span>
+              </div>
+            </div>
+
+            {/* Question Metadata */}
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-1">
+                  <Clock className="h-4 w-4" />
+                  <span>{formatDate(question.created_at)}</span>
                 </div>
-              )}
+                
+                <div className="flex items-center space-x-1">
+                  <MessageSquare className="h-4 w-4" />
+                  <span>{question.response_count} responses</span>
+                </div>
+                
+                <div className="flex items-center space-x-1">
+                  <Users className="h-4 w-4" />
+                  <span>{question.view_count} views</span>
+                </div>
+                
+                <div className="flex items-center space-x-1">
+                  {getVisibilityIcon(question.visibility_level)}
+                  <span className="capitalize">{question.visibility_level.replace('_', ' ')}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
+                  <Tag className="h-4 w-4" />
+                  <span className="capitalize">{question.expected_answer_type}</span>
+                </div>
+                <ArrowRight className="h-4 w-4 text-purple-600" />
+              </div>
             </div>
-            
-            <div className="flex flex-col items-end space-y-2 ml-4">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(question.status)}`}>
-                {question.status}
-              </span>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(question.urgency_level)}`}>
-                {question.urgency_level}
-              </span>
-            </div>
-          </div>
 
-          {/* Question Metadata */}
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-1">
-                <Clock className="h-4 w-4" />
-                <span>{formatDate(question.created_at)}</span>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <MessageSquare className="h-4 w-4" />
-                <span>{question.response_count} responses</span>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <Users className="h-4 w-4" />
-                <span>{question.view_count} views</span>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                {getVisibilityIcon(question.visibility_level)}
-                <span className="capitalize">{question.visibility_level.replace('_', ' ')}</span>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => setSelectedQuestion(question.id)}
-              className="flex items-center space-x-1 text-purple-600 hover:text-purple-700 font-medium"
-            >
-              <span>View Details</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Match Info for matched questions */}
-          {view === 'matched_questions' && (question as any).match_info && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="bg-purple-50 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-900">
-                      Match Score: {Math.round((question as any).match_info.match_score * 100)}%
-                    </p>
-                    <p className="text-xs text-purple-700">
-                      You're matched based on your expertise in {question.primary_tags.join(', ')}
-                    </p>
+            {/* Match Info for matched questions */}
+            {view === 'matched_questions' && (question as any).match_info && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="bg-purple-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-900">
+                        Match Score: {Math.round((question as any).match_info.match_score * 100)}%
+                      </p>
+                      <p className="text-xs text-purple-700">
+                        Matched based on your expertise in {question.primary_tags.slice(0, 2).join(', ')}
+                      </p>
+                    </div>
+                    <div className="bg-purple-600 text-white px-3 py-1 rounded-lg text-sm font-medium">
+                      Answer
+                    </div>
                   </div>
-                  <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors duration-300">
-                    Respond
-                  </button>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      ))}
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

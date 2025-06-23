@@ -128,42 +128,105 @@ export async function createQuestion(
     const analysis = await analyzeQuestionWithAI(title, content);
 
     // Create question with analysis
-    const { data, error } = await supabase.rpc('create_question_with_analysis', {
-      asker_id_param: user.user.id,
-      title_param: title,
-      content_param: content,
-      primary_tags_param: analysis.primary_tags,
-      secondary_tags_param: analysis.secondary_tags,
-      expected_answer_type_param: analysis.expected_answer_type,
-      urgency_param: analysis.urgency_level,
-      visibility_param: options.visibility_level || 'first_degree',
-      is_anonymous_param: options.is_anonymous || false,
-      is_sensitive_param: options.is_sensitive || false
-    });
+    const { data, error } = await supabase
+      .from('questions')
+      .insert({
+        asker_id: user.user.id,
+        title,
+        content,
+        primary_tags: analysis.primary_tags,
+        secondary_tags: analysis.secondary_tags,
+        expected_answer_type: analysis.expected_answer_type,
+        urgency_level: analysis.urgency_level,
+        ai_summary: analysis.summary,
+        visibility_level: options.visibility_level || 'first_degree',
+        is_anonymous: options.is_anonymous || false,
+        is_sensitive: options.is_sensitive || false
+      })
+      .select()
+      .single();
 
     if (error) {
       return { success: false, error: error.message };
     }
 
-    return { success: true, question_id: data };
+    return { success: true, question_id: data.id };
   } catch (error) {
     return { success: false, error: 'Failed to create question' };
   }
 }
 
+// Get question by ID
+export async function getQuestionById(questionId: string): Promise<Question | null> {
+  try {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('id', questionId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching question:', error);
+      return null;
+    }
+
+    // Increment view count
+    await supabase
+      .from('questions')
+      .update({ view_count: (data.view_count || 0) + 1 })
+      .eq('id', questionId);
+
+    return data;
+  } catch (error) {
+    console.error('Error fetching question:', error);
+    return null;
+  }
+}
+
 // Get questions for user (asked by them or matched to them)
 export async function getUserQuestions(): Promise<Question[]> {
-  const { data, error } = await supabase
-    .from('questions')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) return [];
 
-  if (error) {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('asker_id', user.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching user questions:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching user questions:', error);
+    return [];
+  }
+}
+
+// Get all questions (for feed)
+export async function getAllQuestions(): Promise<Question[]> {
+  try {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error fetching questions:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
     console.error('Error fetching questions:', error);
     return [];
   }
-
-  return data || [];
 }
 
 // Get expert matches for a question
@@ -190,25 +253,69 @@ export async function getMatchedQuestions(): Promise<(Question & { match_info: Q
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) return [];
 
-  const { data, error } = await supabase
-    .from('question_matches')
-    .select(`
-      *,
-      question:questions(*)
-    `)
-    .eq('expert_id', user.user.id)
-    .eq('questions.status', 'active')
-    .order('match_score', { ascending: false });
+  // For now, return mock matched questions based on user expertise
+  // In production, this would use the question_matches table
+  try {
+    // Get user's expertise areas
+    const { data: expertise } = await supabase
+      .from('user_expertise')
+      .select('expertise_tag')
+      .eq('user_id', user.user.id);
 
-  if (error) {
+    if (!expertise || expertise.length === 0) {
+      return [];
+    }
+
+    const expertiseTags = expertise.map(e => e.expertise_tag);
+
+    // Find questions that match user's expertise
+    const { data: questions, error } = await supabase
+      .from('questions')
+      .select('*')
+      .neq('asker_id', user.user.id) // Don't match user's own questions
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Error fetching matched questions:', error);
+      return [];
+    }
+
+    // Filter questions that have overlapping tags with user expertise
+    const matchedQuestions = (questions || [])
+      .filter(question => {
+        const allTags = [...question.primary_tags, ...question.secondary_tags];
+        return allTags.some(tag => 
+          expertiseTags.some(expertiseTag => 
+            tag.toLowerCase().includes(expertiseTag.toLowerCase()) ||
+            expertiseTag.toLowerCase().includes(tag.toLowerCase())
+          )
+        );
+      })
+      .map(question => ({
+        ...question,
+        match_info: {
+          id: `match-${question.id}`,
+          question_id: question.id,
+          expert_id: user.user.id,
+          match_score: 0.8,
+          match_reasons: { expertise_overlap: true },
+          tag_relevance_score: 0.8,
+          expertise_confidence: 0.7,
+          response_history_score: 0.6,
+          activity_score: 0.9,
+          network_distance: 1,
+          is_notified: false,
+          created_at: new Date().toISOString()
+        }
+      }));
+
+    return matchedQuestions;
+  } catch (error) {
     console.error('Error fetching matched questions:', error);
     return [];
   }
-
-  return data?.map(match => ({
-    ...match.question,
-    match_info: match
-  })) || [];
 }
 
 // Respond to a question
@@ -241,15 +348,11 @@ export async function respondToQuestion(
     // Update question response count
     await supabase
       .from('questions')
-      .update({ response_count: supabase.sql`response_count + 1` })
+      .update({ 
+        response_count: supabase.sql`response_count + 1`,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', questionId);
-
-    // Mark match as responded
-    await supabase
-      .from('question_matches')
-      .update({ responded_at: new Date().toISOString() })
-      .eq('question_id', questionId)
-      .eq('expert_id', user.user.id);
 
     return { success: true, response_id: data.id };
   } catch (error) {

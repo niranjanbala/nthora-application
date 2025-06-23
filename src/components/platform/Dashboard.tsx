@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Network, Sparkles, Zap, ArrowRight, Trophy, User } from 'lucide-react';
 import QuestionComposer from '../questions/QuestionComposer';
 import QuestionFeed from '../questions/QuestionFeed';
@@ -30,9 +31,24 @@ type DashboardView =
   | 'network_depth';
 
 const Dashboard: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentView, setCurrentView] = useState<DashboardView>('feed');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
+
+  // Handle URL-based view changes
+  useEffect(() => {
+    const view = searchParams.get('view') as DashboardView;
+    if (view && navigationItems.some(item => item.id === view)) {
+      setCurrentView(view);
+    }
+  }, [searchParams]);
+
+  const handleViewChange = (view: DashboardView) => {
+    setCurrentView(view);
+    setSearchParams({ view });
+    setIsMobileMenuOpen(false);
+  };
 
   const navigationItems = [
     { id: 'feed', label: 'Feed', icon: MessageSquare, badge: null, description: 'Latest questions and activity' },
@@ -55,7 +71,7 @@ const Dashboard: React.FC = () => {
       case 'feed':
         return <QuestionFeed view="all" />;
       case 'ask_question':
-        return <QuestionComposer onQuestionCreated={() => setCurrentView('my_questions')} />;
+        return <QuestionComposer onQuestionCreated={() => handleViewChange('my_questions')} />;
       case 'my_questions':
         return <QuestionFeed view="my_questions" />;
       case 'matched_questions':
@@ -227,10 +243,7 @@ const Dashboard: React.FC = () => {
                     return (
                       <button
                         key={item.id}
-                        onClick={() => {
-                          setCurrentView(item.id as DashboardView);
-                          setIsMobileMenuOpen(false);
-                        }}
+                        onClick={() => handleViewChange(item.id as DashboardView)}
                         className={`w-full flex items-center justify-between p-4 rounded-xl text-left transition-all duration-300 ${
                           isActive
                             ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
@@ -301,7 +314,7 @@ const Dashboard: React.FC = () => {
                     return (
                       <button
                         key={item.id}
-                        onClick={() => setCurrentView(item.id as DashboardView)}
+                        onClick={() => handleViewChange(item.id as DashboardView)}
                         className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition-all duration-300 ${
                           isActive
                             ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg transform scale-105'
@@ -327,7 +340,7 @@ const Dashboard: React.FC = () => {
 
               {/* Badge Progress */}
               <BadgeProgress 
-                onViewAllBadges={() => setCurrentView('badges')}
+                onViewAllBadges={() => handleViewChange('badges')}
               />
 
               {/* Quick Action */}
@@ -340,7 +353,7 @@ const Dashboard: React.FC = () => {
                   Got a burning question? Get expert answers from your network instantly.
                 </p>
                 <button
-                  onClick={() => setCurrentView('ask_question')}
+                  onClick={() => handleViewChange('ask_question')}
                   className="w-full bg-white/20 hover:bg-white/30 text-white py-2 px-4 rounded-lg transition-colors duration-300 flex items-center justify-center space-x-2"
                 >
                   <Plus className="h-4 w-4" />
@@ -362,7 +375,7 @@ const Dashboard: React.FC = () => {
       <div className="lg:hidden fixed bottom-6 right-6 z-30">
         <button
           onClick={() => {
-            setCurrentView('ask_question');
+            handleViewChange('ask_question');
             setIsMobileMenuOpen(false);
           }}
           className="w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center transform hover:scale-110"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Tag, Lock, Globe, AlertTriangle, Sparkles } from 'lucide-react';
+import { Send, Tag, Lock, Globe, AlertTriangle, Sparkles, CheckCircle } from 'lucide-react';
 import { createQuestion, analyzeQuestionWithAI } from '../../services/questionRoutingService';
 
 interface QuestionComposerProps {
@@ -16,16 +16,19 @@ const QuestionComposer: React.FC<QuestionComposerProps> = ({ onQuestionCreated }
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSensitive, setIsSensitive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const handleAnalyze = async () => {
     if (!title.trim() || !content.trim()) return;
 
     setIsAnalyzing(true);
+    setError(null);
     try {
       const result = await analyzeQuestionWithAI(title, content);
       setAnalysis(result);
     } catch (error) {
       console.error('Analysis failed:', error);
+      setError('Failed to analyze question. You can still submit it.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -48,14 +51,18 @@ const QuestionComposer: React.FC<QuestionComposerProps> = ({ onQuestionCreated }
       });
 
       if (result.success && result.question_id) {
-        onQuestionCreated?.(result.question_id);
-        // Reset form
-        setTitle('');
-        setContent('');
-        setAnalysis(null);
-        setVisibilityLevel('first_degree');
-        setIsAnonymous(false);
-        setIsSensitive(false);
+        setSuccess(true);
+        // Reset form after a delay
+        setTimeout(() => {
+          setTitle('');
+          setContent('');
+          setAnalysis(null);
+          setVisibilityLevel('first_degree');
+          setIsAnonymous(false);
+          setIsSensitive(false);
+          setSuccess(false);
+          onQuestionCreated?.(result.question_id!);
+        }, 2000);
       } else {
         setError(result.error || 'Failed to create question');
       }
@@ -65,6 +72,16 @@ const QuestionComposer: React.FC<QuestionComposerProps> = ({ onQuestionCreated }
       setIsSubmitting(false);
     }
   };
+
+  // Auto-analyze when user stops typing
+  React.useEffect(() => {
+    if (title.trim() && content.trim() && !isAnalyzing && !analysis) {
+      const timer = setTimeout(() => {
+        handleAnalyze();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [title, content, isAnalyzing, analysis]);
 
   const getVisibilityIcon = (level: string) => {
     switch (level) {
@@ -83,6 +100,25 @@ const QuestionComposer: React.FC<QuestionComposerProps> = ({ onQuestionCreated }
       default: return 'Private to your network';
     }
   };
+
+  if (success) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="h-8 w-8 text-green-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Question Posted Successfully!</h3>
+        <p className="text-gray-600 mb-4">
+          Your question has been posted and is being matched with relevant experts in your network.
+        </p>
+        <div className="bg-green-50 rounded-lg p-4">
+          <p className="text-green-800 text-sm">
+            You'll receive notifications when experts respond to your question.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -137,14 +173,16 @@ const QuestionComposer: React.FC<QuestionComposerProps> = ({ onQuestionCreated }
         {(title.trim() || content.trim()) && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-purple-900">AI Analysis Preview</h4>
-              <button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing || (!title.trim() && !content.trim())}
-                className="text-sm text-purple-600 hover:text-purple-700 disabled:opacity-50"
-              >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze'}
-              </button>
+              <h4 className="text-sm font-medium text-purple-900 flex items-center">
+                <Sparkles className="h-4 w-4 mr-2" />
+                AI Analysis Preview
+              </h4>
+              {isAnalyzing && (
+                <div className="flex items-center space-x-2 text-purple-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                  <span className="text-sm">Analyzing...</span>
+                </div>
+              )}
             </div>
             
             {analysis && (
@@ -174,8 +212,28 @@ const QuestionComposer: React.FC<QuestionComposerProps> = ({ onQuestionCreated }
                     <span className="font-medium text-purple-700">Urgency:</span>
                     <span className="ml-1 text-purple-600 capitalize">{analysis.urgency_level}</span>
                   </div>
+                  <div className="col-span-2">
+                    <span className="font-medium text-purple-700">Confidence:</span>
+                    <span className="ml-1 text-purple-600">{Math.round(analysis.confidence * 100)}%</span>
+                  </div>
                 </div>
+
+                {analysis.summary && (
+                  <div className="bg-white rounded-lg p-3 border border-purple-200">
+                    <p className="text-xs font-medium text-purple-700 mb-1">AI Summary:</p>
+                    <p className="text-sm text-purple-800">{analysis.summary}</p>
+                  </div>
+                )}
               </div>
+            )}
+
+            {!analysis && !isAnalyzing && (title.trim() && content.trim()) && (
+              <button
+                onClick={handleAnalyze}
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                Click to analyze with AI
+              </button>
             )}
           </div>
         )}
