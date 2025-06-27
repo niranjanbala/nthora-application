@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, AlertCircle, Users, ArrowRight, Mail, Key, User } from 'lucide-react';
-import { validateInviteCode, registerWithInvite } from '../../services/membershipService';
+import { validateInviteCode } from '../../services/membershipService';
 import { getEarlyUserByEmail } from '../../services/earlyUserService';
-import { sendOtpCode, verifyOtpAndSignIn } from '../../services/authService';
+import { 
+  sendOtpCode, 
+  verifyOtpAndSignIn, 
+  sendSignupOtpCode, 
+  createUserProfile 
+} from '../../services/authService';
 
 const InviteRegistration: React.FC = () => {
   const { inviteCode: urlInviteCode } = useParams<{ inviteCode?: string }>();
@@ -11,7 +16,7 @@ const InviteRegistration: React.FC = () => {
   
   // Multi-stage flow
   const [currentStage, setCurrentStage] = useState<
-    'email_input' | 'early_user_otp' | 'invite_code_input' | 'new_user_form' | 'success'
+    'email_input' | 'early_user_otp' | 'invite_code_input' | 'new_user_form' | 'signup_otp' | 'success'
   >('email_input');
   
   // Email input stage
@@ -174,22 +179,66 @@ const InviteRegistration: React.FC = () => {
     setError(null);
 
     try {
-      const result = await registerWithInvite(
-        email,
-        formData.fullName,
-        formData.bio,
-        formData.expertiseAreas,
-        inviteCode
-      );
-
-      if (result.success) {
-        setCurrentStage('success');
+      // Send signup OTP code for new user
+      const otpResult = await sendSignupOtpCode(email);
+      
+      if (otpResult.success) {
+        // Move to signup OTP verification stage
+        setCurrentStage('signup_otp');
       } else {
-        setError(result.message);
+        setError(otpResult.error || 'Failed to send verification code');
       }
     } catch (error) {
-      console.error('Error registering:', error);
+      console.error('Error initiating signup:', error);
       setError('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignupOtpVerification = async () => {
+    if (!otpCode.trim()) {
+      setError('Please enter the verification code');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Verify OTP and sign in the new user
+      const result = await verifyOtpAndSignIn(email, otpCode);
+      
+      if (result.success && result.user) {
+        // OTP verification successful, create user profile
+        const profileResult = await createUserProfile(
+          result.user.id,
+          email,
+          {
+            full_name: formData.fullName,
+            bio: formData.bio,
+            expertise_areas: formData.expertiseAreas,
+            invite_code_used: inviteCode,
+            invited_by: inviteCodeData?.createdBy,
+            onboarding_details: {
+              registrationMethod: 'invite',
+              inviteCode: inviteCode,
+              registrationDate: new Date().toISOString()
+            }
+          }
+        );
+
+        if (profileResult.success) {
+          setCurrentStage('success');
+        } else {
+          setError(profileResult.error || 'Failed to create user profile');
+        }
+      } else {
+        setError(result.error || 'Invalid verification code');
+      }
+    } catch (error) {
+      console.error('Error verifying signup OTP:', error);
+      setError('Failed to verify code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -485,9 +534,74 @@ const InviteRegistration: React.FC = () => {
           {loading ? (
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
           ) : (
-            <span>Complete Registration</span>
+            <span>Continue to Verification</span>
           )}
         </button>
+      </div>
+    </>
+  );
+
+  const renderSignupOtpStage = () => (
+    <>
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="h-8 w-8 text-blue-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify Your Email</h2>
+        <p className="text-gray-600">We've sent a 6-digit code to {email}</p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Verification Code
+          </label>
+          <input
+            type="text"
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+            placeholder="Enter 6-digit code"
+            maxLength={6}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-center text-lg tracking-wider"
+            required
+          />
+        </div>
+
+        {error && (
+          <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
+            <AlertCircle className="h-5 w-5" />
+            <span className="text-sm">{error}</span>
+          </div>
+        )}
+
+        <button
+          onClick={handleSignupOtpVerification}
+          disabled={loading || otpCode.length !== 6}
+          className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors duration-300 flex items-center justify-center space-x-2"
+        >
+          {loading ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+          ) : (
+            <>
+              <span>Complete Registration</span>
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
+        </button>
+
+        <div className="text-center">
+          <button
+            onClick={() => {
+              setOtpCode('');
+              setError(null);
+              // Send the OTP code again
+              sendSignupOtpCode(email);
+            }}
+            className="text-purple-600 hover:text-purple-700 text-sm"
+          >
+            Resend verification code
+          </button>
+        </div>
       </div>
     </>
   );
@@ -520,6 +634,8 @@ const InviteRegistration: React.FC = () => {
         return renderInviteCodeStage();
       case 'new_user_form':
         return renderNewUserFormStage();
+      case 'signup_otp':
+        return renderSignupOtpStage();
       case 'success':
         return renderSuccessStage();
       default:

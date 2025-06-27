@@ -126,29 +126,32 @@ export async function updateUserProfile(updates: Partial<UserProfile>): Promise<
 }
 
 // Create user profile (used during onboarding)
-export async function createUserProfile(profileData: {
-  full_name: string;
-  bio?: string;
-  expertise_areas: string[];
-  invited_by?: string;
-  invite_code_used?: string;
-  onboarding_details?: Record<string, any>;
-}): Promise<{
+export async function createUserProfile(
+  userId: string,
+  email: string,
+  profileData: {
+    full_name: string;
+    bio?: string;
+    expertise_areas: string[];
+    invited_by?: string;
+    invite_code_used?: string;
+    onboarding_details?: Record<string, any>;
+  }
+): Promise<{
   success: boolean;
   profile?: UserProfile;
   error?: string;
 }> {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return { success: false, error: 'Not authenticated' };
+    if (!userId || !email) {
+      return { success: false, error: 'User ID and email are required' };
     }
 
     const { data, error } = await supabase
       .from('user_profiles')
       .insert({
-        id: user.id,
-        email: user.email!,
+        id: userId,
+        email: email,
         ...profileData,
         role: 'pending',
         membership_status: 'pending_approval'
@@ -166,7 +169,7 @@ export async function createUserProfile(profileData: {
   }
 }
 
-// Send OTP code to user's email
+// Send OTP code to user's email (for login - existing users only)
 export async function sendOtpCode(email: string): Promise<{
   success: boolean;
   error?: string;
@@ -188,6 +191,32 @@ export async function sendOtpCode(email: string): Promise<{
     return { success: true };
   } catch (error) {
     console.error('Error sending OTP code:', error);
+    return { success: false, error: 'Failed to send verification code' };
+  }
+}
+
+// Send OTP code for signup (new users)
+export async function sendSignupOtpCode(email: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    // Use Supabase's built-in OTP functionality with shouldCreateUser: true
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email,
+      options: {
+        shouldCreateUser: true, // Create new user if they don't exist
+      }
+    });
+
+    if (error) {
+      console.error('Error sending signup OTP code:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending signup OTP code:', error);
     return { success: false, error: 'Failed to send verification code' };
   }
 }
