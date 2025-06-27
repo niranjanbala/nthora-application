@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import OnboardingFlow from '../components/onboarding/OnboardingFlow';
-import { createUserProfile } from '../services/authService';
+import { createUserProfile, getCurrentUser } from '../services/authService';
 import { updateUserExpertise } from '../services/questionRoutingService';
 
 const Onboarding: React.FC = () => {
@@ -16,6 +16,17 @@ const Onboarding: React.FC = () => {
     console.log('Onboarding completed with data:', data);
     
     try {
+      // Get the current authenticated user
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        console.error('No authenticated user found');
+        alert('Authentication error. Please log in again.');
+        navigate('/login');
+        return;
+      }
+
+      console.log('Current user:', currentUser);
+
       // Extract profile data
       const profileData = {
         full_name: data.fullName || 
@@ -43,8 +54,12 @@ const Onboarding: React.FC = () => {
         }
       };
 
-      // Create user profile
-      const profileResult = await createUserProfile(profileData);
+      // Create user profile with user ID and email
+      const profileResult = await createUserProfile(
+        currentUser.id,
+        currentUser.email || verifiedEmail || earlyUserData?.email || '',
+        profileData
+      );
       
       if (!profileResult.success) {
         console.error('Failed to create user profile:', profileResult.error);

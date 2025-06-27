@@ -1,5 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -9,7 +7,7 @@ interface RoleRequest {
   text: string;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -71,7 +69,7 @@ Respond in JSON format:
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at analyzing professional roles and career levels. Extract accurate role information from descriptions. Use standard job titles and industry terminology.'
+            content: 'You are an expert at analyzing professional roles and career levels. Extract accurate role information from descriptions. Use standard job titles and industry terminology. Always respond with valid JSON only, no markdown formatting.'
           },
           {
             role: 'user',
@@ -95,9 +93,26 @@ Respond in JSON format:
     }
 
     const data = await response.json()
-    const content = data.choices[0].message.content
+    let content = data.choices[0].message.content
 
     try {
+      // Clean up the response content to handle potential markdown formatting
+      content = content.trim()
+      
+      // Remove markdown code block delimiters if present
+      if (content.startsWith('```json')) {
+        content = content.replace(/^```json\s*/, '')
+      }
+      if (content.startsWith('```')) {
+        content = content.replace(/^```\s*/, '')
+      }
+      if (content.endsWith('```')) {
+        content = content.replace(/\s*```$/, '')
+      }
+      
+      // Trim again after removing markdown
+      content = content.trim()
+
       const parsed = JSON.parse(content)
       const result = {
         primaryRole: parsed.primaryRole || '',
@@ -116,8 +131,15 @@ Respond in JSON format:
         }
       )
     } catch (parseError) {
+      console.error('Failed to parse OpenAI response:', parseError)
+      console.error('Raw content:', content)
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to parse OpenAI response' }),
+        JSON.stringify({ 
+          error: 'Failed to parse OpenAI response',
+          details: parseError.message,
+          rawContent: content.substring(0, 200) // First 200 chars for debugging
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -125,6 +147,7 @@ Respond in JSON format:
       )
     }
   } catch (error) {
+    console.error('Edge function error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
