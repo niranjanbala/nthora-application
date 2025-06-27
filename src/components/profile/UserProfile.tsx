@@ -31,22 +31,34 @@ const UserProfile: React.FC<UserProfileProps> = ({
 
   const loadUserData = async () => {
     setLoading(true);
+    console.log('UserProfile - loadUserData - Starting to load user data for userId:', userId);
+    
     try {
       // Load user profile
+      console.log('UserProfile - Calling getUserProfile');
       const profile = await getUserProfile(userId);
+      console.log('UserProfile - Profile data received:', profile);
       setUserProfile(profile);
 
       // Load user expertise
+      console.log('UserProfile - Calling getUserExpertise');
       const expertise = await getUserExpertise(userId);
+      console.log('UserProfile - Expertise data received:', expertise);
       setUserExpertise(expertise);
 
       // Load auto-detected skills
+      console.log('UserProfile - Calling getAutoDetectedSkills');
       const skills = await getAutoDetectedSkills();
+      console.log('UserProfile - Skills data received:', skills);
       setAutoDetectedSkills(skills);
 
       // Load network activity
+      console.log('UserProfile - Calling getNetworkActivityFeed');
       const activity = await getNetworkActivityFeed(2, 10);
+      console.log('UserProfile - Network activity received:', activity);
       setNetworkActivity(activity);
+      
+      console.log('UserProfile - All data loaded successfully');
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {

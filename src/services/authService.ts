@@ -37,6 +37,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
+    console.log('getCurrentUser - Retrieved user:', user?.id);
     return user;
   } catch (error) {
     if (error instanceof Error && error.message === 'Auth session missing!') {
@@ -72,8 +73,11 @@ export async function getUserProfile(userId?: string): Promise<UserProfile | nul
     const targetUserId = userId || (await getCurrentUser())?.id;
     
     if (!targetUserId) {
+      console.error('getUserProfile - No target user ID available');
       return null;
     }
+
+    console.log('getUserProfile - Fetching profile for user ID:', targetUserId);
 
     const { data, error } = await supabase
       .from('user_profiles')
@@ -86,6 +90,7 @@ export async function getUserProfile(userId?: string): Promise<UserProfile | nul
       return null;
     }
 
+    console.log('getUserProfile - Retrieved profile data:', data);
     return data;
   } catch (error) {
     console.error('Error getting user profile:', error);
@@ -144,8 +149,15 @@ export async function createUserProfile(
 }> {
   try {
     if (!userId || !email) {
+      console.error('createUserProfile - Missing required fields:', { userId, email });
       return { success: false, error: 'User ID and email are required' };
     }
+
+    console.log('createUserProfile - Creating profile with data:', {
+      userId,
+      email,
+      ...profileData
+    });
 
     const { data, error } = await supabase
       .from('user_profiles')
@@ -160,11 +172,14 @@ export async function createUserProfile(
       .single();
 
     if (error) {
+      console.error('createUserProfile - Insert error:', error);
       return { success: false, error: error.message };
     }
 
+    console.log('createUserProfile - Profile created successfully:', data);
     return { success: true, profile: data };
   } catch (error) {
+    console.error('createUserProfile - Unexpected error:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
@@ -228,6 +243,8 @@ export async function verifyOtpAndSignIn(email: string, token: string): Promise<
   error?: string;
 }> {
   try {
+    console.log('verifyOtpAndSignIn - Verifying OTP for email:', email);
+    
     const { data, error } = await supabase.auth.verifyOtp({
       email,
       token,
@@ -235,13 +252,16 @@ export async function verifyOtpAndSignIn(email: string, token: string): Promise<
     });
 
     if (error) {
+      console.error('verifyOtpAndSignIn - Verification error:', error);
       return { success: false, error: error.message };
     }
 
     if (!data.user) {
+      console.error('verifyOtpAndSignIn - No user returned after verification');
       return { success: false, error: 'Authentication failed' };
     }
 
+    console.log('verifyOtpAndSignIn - User authenticated successfully:', data.user.id);
     return { success: true, user: data.user };
   } catch (error) {
     console.error('Error verifying OTP:', error);
@@ -252,6 +272,7 @@ export async function verifyOtpAndSignIn(email: string, token: string): Promise<
 // Listen to auth state changes
 export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
   return supabase.auth.onAuthStateChange((event, session) => {
+    console.log('Auth state changed:', event, session?.user?.id);
     callback(session?.user || null);
   });
 }
