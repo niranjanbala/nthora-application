@@ -179,7 +179,7 @@ export async function sendOtpCode(email: string): Promise<{
     const { error } = await supabase.auth.signInWithOtp({
       email: email,
       options: {
-        shouldCreateUser: false, // Only allow existing users to sign in
+        shouldCreateUser: true, // Only allow existing users to sign in
       }
     });
 
