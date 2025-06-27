@@ -1,19 +1,21 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 interface RoleRequest {
   text: string;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { text }: RoleRequest = await req.json()
+    const { text }: RoleRequest = await req.json();
 
     if (!text || text.length < 5) {
       return new Response(
@@ -22,10 +24,10 @@ Deno.serve(async (req) => {
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      )
+      );
     }
 
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       return new Response(
         JSON.stringify({ error: 'OpenAI API key not configured' }),
@@ -33,7 +35,7 @@ Deno.serve(async (req) => {
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      )
+      );
     }
 
     const prompt = `
@@ -56,7 +58,7 @@ Respond in JSON format:
   "suggestedRoles": ["Product Owner", "Product Lead"],
   "industries": ["SaaS", "Technology"],
   "confidence": 0.9
-}`
+}`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -79,41 +81,41 @@ Respond in JSON format:
         temperature: 0.3,
         max_tokens: 500,
       }),
-    })
+    });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorData = await response.json().catch(() => ({}));
       return new Response(
         JSON.stringify({ error: errorData.error?.message || `OpenAI API error: ${response.status}` }),
         { 
           status: response.status, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      )
+      );
     }
 
-    const data = await response.json()
-    let content = data.choices[0].message.content
+    const data = await response.json();
+    let content = data.choices[0].message.content;
 
     try {
       // Clean up the response content to handle potential markdown formatting
-      content = content.trim()
+      content = content.trim();
       
       // Remove markdown code block delimiters if present
       if (content.startsWith('```json')) {
-        content = content.replace(/^```json\s*/, '')
+        content = content.replace(/^```json\s*/, '');
       }
       if (content.startsWith('```')) {
-        content = content.replace(/^```\s*/, '')
+        content = content.replace(/^```\s*/, '');
       }
       if (content.endsWith('```')) {
-        content = content.replace(/\s*```$/, '')
+        content = content.replace(/\s*```$/, '');
       }
       
       // Trim again after removing markdown
-      content = content.trim()
+      content = content.trim();
 
-      const parsed = JSON.parse(content)
+      const parsed = JSON.parse(content);
       const result = {
         primaryRole: parsed.primaryRole || '',
         roleLevel: parsed.roleLevel || 'mid',
@@ -122,17 +124,17 @@ Respond in JSON format:
         industries: parsed.industries || [],
         confidence: parsed.confidence || 0.5,
         tags: [parsed.primaryRole, ...(parsed.suggestedRoles || [])].filter(Boolean),
-      }
+      };
 
       return new Response(
         JSON.stringify(result),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      )
+      );
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response:', parseError)
-      console.error('Raw content:', content)
+      console.error('Failed to parse OpenAI response:', parseError);
+      console.error('Raw content:', content);
       
       return new Response(
         JSON.stringify({ 
@@ -144,16 +146,16 @@ Respond in JSON format:
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      )
+      );
     }
   } catch (error) {
-    console.error('Edge function error:', error)
+    console.error('Edge function error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    )
+    );
   }
-})
+});

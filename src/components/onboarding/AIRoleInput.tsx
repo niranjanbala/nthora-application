@@ -21,6 +21,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
   const [parsedData, setParsedData] = useState<ParsedRole | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Debounced parsing function
   const debouncedParse = useCallback(
@@ -31,12 +32,14 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
       }
 
       setIsAnalyzing(true);
+      setError(null);
       try {
         const result = await parseRoleText(text);
         setParsedData(result);
         setShowSuggestions(true);
       } catch (error) {
         console.error('Parsing error:', error);
+        setError('Failed to analyze role. You can still enter your role manually.');
       } finally {
         setIsAnalyzing(false);
       }
@@ -130,6 +133,12 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
             </div>
           )}
         </div>
+        
+        {error && (
+          <div className="mt-2 text-sm text-red-600">
+            {error}
+          </div>
+        )}
       </div>
 
       {/* AI Analysis Results */}
@@ -225,7 +234,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <span className="text-sm font-medium text-gray-700">Selected Role</span>
+            <span className="text-sm font-medium text-gray-700">Selected Primary Role</span>
           </div>
           <div className="bg-white rounded-lg p-3 border border-gray-200">
             <div className="font-medium text-gray-900">{value}</div>

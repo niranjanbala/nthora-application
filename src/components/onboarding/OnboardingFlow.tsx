@@ -7,7 +7,8 @@ import AIHelpTopicsInput from './AIHelpTopicsInput';
 import CategoryUnlockFlow from './CategoryUnlockFlow';
 
 interface OnboardingData {
-  role: string;
+  primaryRole: string;
+  additionalRoles: string[];
   industries: string[];
   expertiseAreas: string[];
   helpTopics: string[];
@@ -39,7 +40,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [data, setData] = useState<OnboardingData>({
-    role: '',
+    primaryRole: '',
+    additionalRoles: [],
     industries: [],
     expertiseAreas: [],
     helpTopics: [],
@@ -50,6 +52,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     timeCommitment: 30,
     networkStrength: 8 // Starting network strength
   });
+  const [newAdditionalRole, setNewAdditionalRole] = useState('');
 
   // Initialize data from early user information if available
   useEffect(() => {
@@ -68,7 +71,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         email: verifiedEmail || '',
         
         // Extract data from more_details
-        role: moreDetails.role || prev.role,
+        primaryRole: moreDetails.role || prev.primaryRole,
+        additionalRoles: moreDetails.additionalRoles || [],
         industries: moreDetails.industries || moreDetails.industry ? 
           [moreDetails.industries || moreDetails.industry] : 
           prev.industries,
@@ -123,8 +127,23 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
   const handleRoleChange = (role: string, detectedIndustries: string[]) => {
     updateData({ 
-      role,
+      primaryRole: role,
       industries: [...new Set([...data.industries, ...detectedIndustries])]
+    });
+  };
+
+  const handleAddAdditionalRole = () => {
+    if (newAdditionalRole.trim() && !data.additionalRoles.includes(newAdditionalRole.trim())) {
+      updateData({
+        additionalRoles: [...data.additionalRoles, newAdditionalRole.trim()]
+      });
+      setNewAdditionalRole('');
+    }
+  };
+
+  const handleRemoveAdditionalRole = (role: string) => {
+    updateData({
+      additionalRoles: data.additionalRoles.filter(r => r !== role)
     });
   };
 
@@ -155,7 +174,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return data.role && data.industries.length > 0;
+      case 1: return data.primaryRole && data.industries.length > 0;
       case 2: return data.expertiseAreas.length > 0;
       case 3: return data.helpTopics.length > 0;
       case 4: return true; // Network unlock step is optional
@@ -215,9 +234,55 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             </div>
 
             <AIRoleInput
-              value={data.role}
+              value={data.primaryRole}
               onChange={handleRoleChange}
             />
+
+            {/* Additional Roles Section */}
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Additional Roles</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Have you held multiple roles? Add them here to showcase your diverse experience.
+              </p>
+              
+              {data.additionalRoles.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {data.additionalRoles.map((role) => (
+                      <span
+                        key={role}
+                        className="bg-blue-100 text-blue-700 px-3 py-2 rounded-full text-sm flex items-center space-x-2"
+                      >
+                        <span>{role}</span>
+                        <button
+                          onClick={() => handleRemoveAdditionalRole(role)}
+                          className="text-blue-500 hover:text-blue-700 font-bold"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newAdditionalRole}
+                  onChange={(e) => setNewAdditionalRole(e.target.value)}
+                  placeholder="e.g., Product Manager, Software Engineer"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddAdditionalRole()}
+                />
+                <button
+                  onClick={handleAddAdditionalRole}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-300"
+                >
+                  Add Role
+                </button>
+              </div>
+            </div>
 
             <AIIndustryInput
               value={data.industries}
@@ -490,7 +555,12 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                       ? `${initialOnboardingData.first_name} ${initialOnboardingData.last_name || ''}`
                       : data.fullName || 'Your Name'}
                   </h3>
-                  <p className="text-gray-600">{data.role}</p>
+                  <p className="text-gray-600">{data.primaryRole}</p>
+                  {data.additionalRoles.length > 0 && (
+                    <p className="text-sm text-gray-500">
+                      Also: {data.additionalRoles.join(', ')}
+                    </p>
+                  )}
                   <div className="flex items-center space-x-2 mt-1">
                     {data.industries.slice(0, 2).map((industry) => (
                       <span key={industry} className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">

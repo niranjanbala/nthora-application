@@ -36,7 +36,8 @@ const Onboarding: React.FC = () => {
         invited_by: data.referredBy || earlyUserData?.referred_by || undefined,
         invite_code_used: data.inviteCode || earlyUserData?.referral_code || inviteCode || undefined,
         onboarding_details: {
-          role: data.role,
+          primaryRole: data.primaryRole,
+          additionalRoles: data.additionalRoles || [],
           industries: data.industries || [],
           helpTopics: data.helpTopics || [],
           currentStruggles: data.currentStruggles || '',

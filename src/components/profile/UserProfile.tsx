@@ -121,6 +121,22 @@ const UserProfile: React.FC<UserProfileProps> = ({
     return 'Very Low';
   };
 
+  // Get additional roles from onboarding details
+  const getAdditionalRoles = () => {
+    if (userProfile?.onboarding_details?.additionalRoles) {
+      return userProfile.onboarding_details.additionalRoles;
+    }
+    return [];
+  };
+
+  // Get primary role from onboarding details or fallback to role
+  const getPrimaryRole = () => {
+    if (userProfile?.onboarding_details?.primaryRole) {
+      return userProfile.onboarding_details.primaryRole;
+    }
+    return userProfile?.role || user.role;
+  };
+
   return (
     <div className="space-y-6">
       {/* Profile Header */}
@@ -132,7 +148,15 @@ const UserProfile: React.FC<UserProfileProps> = ({
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{userProfile?.full_name || user.name}</h1>
-              <p className="text-gray-600">{userProfile?.role || user.role} {userProfile?.company || user.company ? `at ${userProfile?.company || user.company}` : ''}</p>
+              <p className="text-gray-600">{getPrimaryRole()} {userProfile?.company || user.company ? `at ${userProfile?.company || user.company}` : ''}</p>
+              
+              {/* Additional Roles */}
+              {getAdditionalRoles().length > 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Also: {getAdditionalRoles().join(', ')}
+                </p>
+              )}
+              
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
                 <div className="flex items-center space-x-1">
                   <MapPin className="h-4 w-4" />
