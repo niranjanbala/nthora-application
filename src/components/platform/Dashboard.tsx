@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User } from 'lucide-react';
+import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User, LogOut } from 'lucide-react';
 import QuestionComposer from '../questions/QuestionComposer';
 import QuestionFeed from '../questions/QuestionFeed';
 import ExpertiseManager from '../questions/ExpertiseManager';
@@ -17,6 +17,7 @@ import UserNetworkBadges from '../profile/UserNetworkBadges';
 import NetworkDepthBadges from '../badges/NetworkDepthBadges';
 import NetworkActivityFeed from '../network/NetworkActivityFeed';
 import AutoDetectedSkills from '../network/AutoDetectedSkills';
+import { signOut } from '../../services/authService';
 
 type DashboardView = 
   | 'feed' 
@@ -40,6 +41,7 @@ const Dashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState<DashboardView>('feed');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
+  const navigate = useNavigate();
 
   // Handle URL-based view changes
   useEffect(() => {
@@ -53,6 +55,13 @@ const Dashboard: React.FC = () => {
     setCurrentView(view);
     setSearchParams({ view });
     setIsMobileMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    const result = await signOut();
+    if (result.success) {
+      navigate('/login');
+    }
   };
 
   const navigationItems = [
@@ -211,6 +220,14 @@ const Dashboard: React.FC = () => {
               <div className="w-8 h-8 bg-surface-100 rounded-full flex items-center justify-center">
                 <User className="h-4 w-4 text-ink-base" />
               </div>
+              
+              <button 
+                onClick={handleLogout}
+                className="p-2 text-ink-light hover:text-blush-600 transition-colors duration-300"
+                title="Logout"
+              >
+                <LogOut className="h-6 w-6" />
+              </button>
             </div>
           </div>
         </div>
@@ -291,6 +308,22 @@ const Dashboard: React.FC = () => {
                         </button>
                       );
                     })}
+                    
+                    {/* Logout Button for Mobile */}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-between p-4 rounded-xl text-left transition-all duration-300 text-blush-700 hover:bg-blush-50 mt-4"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <LogOut className="h-5 w-5" />
+                        <div>
+                          <div className="font-medium">Logout</div>
+                          <div className="text-xs text-blush-600/70">
+                            Sign out of your account
+                          </div>
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 </div>
 
@@ -358,6 +391,17 @@ const Dashboard: React.FC = () => {
                       </button>
                     );
                   })}
+                  
+                  {/* Logout Button for Desktop Sidebar */}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-between p-3 rounded-lg text-left transition-all duration-300 text-blush-700 hover:bg-blush-50 mt-2"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <LogOut className="h-5 w-5" />
+                      <span className="font-medium">Logout</span>
+                    </div>
+                  </button>
                 </div>
               </nav>
 
