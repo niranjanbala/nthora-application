@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, CheckCircle, Sparkles, Users, Target, Star, Zap, Network, Award, Clock, TrendingUp } from 'lucide-react';
+import { ArrowRight, ArrowLeft, CheckCircle, Sparkles, Users, Target, Star, Zap, Network, Award, Clock, TrendingUp, Volume2, Pause } from 'lucide-react';
 import AIRoleInput from './AIRoleInput';
 import AIIndustryInput from './AIIndustryInput';
 import AIExpertiseInput from './AIExpertiseInput';
 import AIHelpTopicsInput from './AIHelpTopicsInput';
 import CategoryUnlockFlow from './CategoryUnlockFlow';
+import { elevenLabsService } from '../../services/elevenLabsService';
 
 interface OnboardingData {
   fullName: string;
@@ -55,6 +56,11 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     networkStrength: 8 // Starting network strength
   });
   const [newAdditionalRole, setNewAdditionalRole] = useState('');
+  
+  // Audio playback state
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [currentPlayingText, setCurrentPlayingText] = useState<string | null>(null);
 
   // Initialize data from early user information if available
   useEffect(() => {
@@ -163,6 +169,13 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
+      // Stop any playing audio when moving to next step
+      if (currentAudio) {
+        currentAudio.pause();
+        setCurrentAudio(null);
+        setIsPlayingAudio(false);
+        setCurrentPlayingText(null);
+      }
     } else {
       onComplete(data);
     }
@@ -171,6 +184,13 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const prevStep = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      // Stop any playing audio when moving to previous step
+      if (currentAudio) {
+        currentAudio.pause();
+        setCurrentAudio(null);
+        setIsPlayingAudio(false);
+        setCurrentPlayingText(null);
+      }
     }
   };
 
@@ -187,6 +207,63 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     }
   };
 
+  // Handle text-to-speech playback
+  const handlePlayText = async (text: string) => {
+    // If the same text is already playing, toggle pause/play
+    if (currentAudio && currentPlayingText === text) {
+      if (isPlayingAudio) {
+        currentAudio.pause();
+        setIsPlayingAudio(false);
+      } else {
+        currentAudio.play();
+        setIsPlayingAudio(true);
+      }
+      return;
+    }
+    
+    // If different audio is playing, stop it
+    if (currentAudio) {
+      currentAudio.pause();
+      setCurrentAudio(null);
+    }
+    
+    try {
+      setIsPlayingAudio(true);
+      setCurrentPlayingText(text);
+      
+      const result = await elevenLabsService.textToSpeech(text);
+      
+      if (!result.success || !result.audioUrl) {
+        console.error('Failed to get audio:', result.error);
+        setIsPlayingAudio(false);
+        setCurrentPlayingText(null);
+        return;
+      }
+      
+      const audio = new Audio(result.audioUrl);
+      
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        setCurrentAudio(null);
+        setCurrentPlayingText(null);
+      };
+      
+      audio.onerror = () => {
+        console.error('Audio playback error');
+        setIsPlayingAudio(false);
+        setCurrentAudio(null);
+        setCurrentPlayingText(null);
+      };
+      
+      setCurrentAudio(audio);
+      audio.play();
+    } catch (error) {
+      console.error('Error playing text:', error);
+      setIsPlayingAudio(false);
+      setCurrentPlayingText(null);
+    }
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 0:
@@ -196,16 +273,50 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               <Network className="h-10 w-10 text-white" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                {initialOnboardingData 
-                  ? `Welcome back to N-th\`ora, ${initialOnboardingData.first_name || 'Founder'}!` 
-                  : "Welcome to N-th`ora!"}
-              </h2>
-              <p className="text-lg text-gray-600 leading-relaxed">
-                {initialOnboardingData
-                  ? "We're excited to have you back! Let's complete your profile to get the most out of your network."
-                  : "You're about to join an exclusive network where expertise flows freely and trust is built through meaningful connections."}
-              </p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  {initialOnboardingData 
+                    ? `Welcome back to N-th\`ora, ${initialOnboardingData.first_name || 'Founder'}!` 
+                    : "Welcome to N-th`ora!"}
+                </h2>
+                <button 
+                  onClick={() => handlePlayText(initialOnboardingData 
+                    ? `Welcome back to N-th\`ora, ${initialOnboardingData.first_name || 'Founder'}!` 
+                    : "Welcome to N-th`ora!")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to welcome message"
+                >
+                  {isPlayingAudio && currentPlayingText === (initialOnboardingData 
+                    ? `Welcome back to N-th\`ora, ${initialOnboardingData.first_name || 'Founder'}!` 
+                    : "Welcome to N-th`ora!") ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-lg text-gray-600 leading-relaxed">
+                  {initialOnboardingData
+                    ? "We're excited to have you back! Let's complete your profile to get the most out of your network."
+                    : "You're about to join an exclusive network where expertise flows freely and trust is built through meaningful connections."}
+                </p>
+                <button 
+                  onClick={() => handlePlayText(initialOnboardingData
+                    ? "We're excited to have you back! Let's complete your profile to get the most out of your network."
+                    : "You're about to join an exclusive network where expertise flows freely and trust is built through meaningful connections.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to welcome description"
+                >
+                  {isPlayingAudio && currentPlayingText === (initialOnboardingData
+                    ? "We're excited to have you back! Let's complete your profile to get the most out of your network."
+                    : "You're about to join an exclusive network where expertise flows freely and trust is built through meaningful connections.") ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="bg-purple-50 rounded-xl p-6">
               <h3 className="font-semibold text-purple-900 mb-2">How N-th`ora Works</h3>
@@ -231,8 +342,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Tell us about yourself</h2>
-              <p className="text-gray-600">This helps us personalize your experience and suggest relevant connections.</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Tell us about yourself</h2>
+                <button 
+                  onClick={() => handlePlayText("Tell us about yourself")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "Tell us about yourself" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">This helps us personalize your experience and suggest relevant connections.</p>
+                <button 
+                  onClick={() => handlePlayText("This helps us personalize your experience and suggest relevant connections.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "This helps us personalize your experience and suggest relevant connections." ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Full Name Input */}
@@ -312,8 +449,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Share your expertise</h2>
-              <p className="text-gray-600">Our AI will help extract specific expertise areas from your description.</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Share your expertise</h2>
+                <button 
+                  onClick={() => handlePlayText("Share your expertise")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "Share your expertise" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">Our AI will help extract specific expertise areas from your description.</p>
+                <button 
+                  onClick={() => handlePlayText("Our AI will help extract specific expertise areas from your description.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "Our AI will help extract specific expertise areas from your description." ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <AIExpertiseInput
@@ -345,8 +508,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">What do you need help with?</h2>
-              <p className="text-gray-600">Our AI will categorize your needs and help match you with the right experts.</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">What do you need help with?</h2>
+                <button 
+                  onClick={() => handlePlayText("What do you need help with?")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "What do you need help with?" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">Our AI will categorize your needs and help match you with the right experts.</p>
+                <button 
+                  onClick={() => handlePlayText("Our AI will categorize your needs and help match you with the right experts.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "Our AI will categorize your needs and help match you with the right experts." ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <AIHelpTopicsInput
@@ -373,8 +562,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Unlock Specialized Categories</h2>
-              <p className="text-gray-600">Expand your network to access experts in specialized fields.</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Unlock Specialized Categories</h2>
+                <button 
+                  onClick={() => handlePlayText("Unlock Specialized Categories")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "Unlock Specialized Categories" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">Expand your network to access experts in specialized fields.</p>
+                <button 
+                  onClick={() => handlePlayText("Expand your network to access experts in specialized fields.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "Expand your network to access experts in specialized fields." ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <CategoryUnlockFlow
@@ -392,8 +607,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Trust & Network</h2>
-              <p className="text-gray-600">Building meaningful connections starts with trust.</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Trust & Network</h2>
+                <button 
+                  onClick={() => handlePlayText("Trust & Network")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "Trust & Network" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">Building meaningful connections starts with trust.</p>
+                <button 
+                  onClick={() => handlePlayText("Building meaningful connections starts with trust.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "Building meaningful connections starts with trust." ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {(inviterName || data.inviterName) && (
@@ -455,8 +696,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">What brings you here?</h2>
-              <p className="text-gray-600">This helps us personalize your dashboard and notifications.</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">What brings you here?</h2>
+                <button 
+                  onClick={() => handlePlayText("What brings you here?")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "What brings you here?" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">This helps us personalize your dashboard and notifications.</p>
+                <button 
+                  onClick={() => handlePlayText("This helps us personalize your dashboard and notifications.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "This helps us personalize your dashboard and notifications." ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -509,8 +776,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose your first quest</h2>
-              <p className="text-gray-600">Pick a goal to accomplish in your first week and start earning XP!</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose your first quest</h2>
+                <button 
+                  onClick={() => handlePlayText("Choose your first quest")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "Choose your first quest" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">Pick a goal to accomplish in your first week and start earning XP!</p>
+                <button 
+                  onClick={() => handlePlayText("Pick a goal to accomplish in your first week and start earning XP!")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "Pick a goal to accomplish in your first week and start earning XP!" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -557,8 +850,34 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">You're all set!</h2>
-              <p className="text-gray-600">Here's how your profile will appear to others in the network.</p>
+              <div className="flex items-center justify-center space-x-2">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">You're all set!</h2>
+                <button 
+                  onClick={() => handlePlayText("You're all set!")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to heading"
+                >
+                  {isPlayingAudio && currentPlayingText === "You're all set!" ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <p className="text-gray-600">Here's how your profile will appear to others in the network.</p>
+                <button 
+                  onClick={() => handlePlayText("Here's how your profile will appear to others in the network.")}
+                  className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+                  aria-label="Listen to description"
+                >
+                  {isPlayingAudio && currentPlayingText === "Here's how your profile will appear to others in the network." ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Volume2 className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="bg-white border-2 border-purple-200 rounded-xl p-6">
@@ -673,9 +992,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
             ></div>
           </div>
-          <div className="mt-2">
-            <h1 className="text-lg font-semibold text-gray-900">{steps[currentStep].title}</h1>
-            <p className="text-sm text-gray-600">{steps[currentStep].subtitle}</p>
+          <div className="mt-2 flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">{steps[currentStep].title}</h1>
+              <p className="text-sm text-gray-600">{steps[currentStep].subtitle}</p>
+            </div>
+            <button 
+              onClick={() => handlePlayText(`${steps[currentStep].title}. ${steps[currentStep].subtitle}`)}
+              className="p-2 text-purple-600 hover:text-purple-800 transition-colors"
+              aria-label="Listen to step information"
+            >
+              {isPlayingAudio && currentPlayingText === `${steps[currentStep].title}. ${steps[currentStep].subtitle}` ? (
+                <Pause className="h-5 w-5" />
+              ) : (
+                <Volume2 className="h-5 w-5" />
+              )}
+            </button>
           </div>
         </div>
 

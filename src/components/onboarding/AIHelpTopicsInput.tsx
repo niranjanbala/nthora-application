@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Sparkles, CheckCircle, Loader, AlertTriangle, Target, BookOpen, TrendingUp } from 'lucide-react';
+import { Sparkles, CheckCircle, Loader, AlertTriangle, Target, BookOpen, TrendingUp, Mic, StopCircle } from 'lucide-react';
 import { parseHelpTopicsText, debounce, type ParsedHelpTopics } from '../../services/aiParsingService';
+import { elevenLabsService } from '../../services/elevenLabsService';
 
 interface AIHelpTopicsInputProps {
   value: string[];
@@ -21,6 +22,13 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
   const [parsedData, setParsedData] = useState<ParsedHelpTopics | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // Speech-to-text state
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [isProcessingSpeech, setIsProcessingSpeech] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
 
   // Debounced parsing function
   const debouncedParse = useCallback(
@@ -78,6 +86,75 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
     return 'text-red-600 bg-red-100';
   };
 
+  // Speech-to-text functions
+  const handleStartRecording = async () => {
+    setRecordingError(null);
+    setAudioChunks([]);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          setAudioChunks(prev => [...prev, event.data]);
+        }
+      };
+      
+      recorder.onstop = handleProcessRecording;
+      
+      recorder.onerror = (event) => {
+        console.error('Recording error:', event);
+        setRecordingError('Error during recording. Please try again.');
+        setIsRecording(false);
+      };
+      
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      setRecordingError('Could not access microphone. Please check permissions and try again.');
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      // Stop all audio tracks
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const handleProcessRecording = async () => {
+    if (audioChunks.length === 0) return;
+    
+    setIsProcessingSpeech(true);
+    try {
+      // Combine audio chunks into a single blob
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      
+      // Send to speech-to-text service
+      const result = await elevenLabsService.speechToText(audioBlob);
+      
+      if (result.success && result.text) {
+        // Append to existing text or replace it
+        const newText = freeText ? `${freeText} ${result.text}` : result.text;
+        setFreeText(newText);
+        // This will trigger the debounced parse via the useEffect
+      } else {
+        setRecordingError(result.error || 'Failed to transcribe speech. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error processing recording:', error);
+      setRecordingError('Error processing your speech. Please try again.');
+    } finally {
+      setAudioChunks([]);
+      setIsProcessingSpeech(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Label and Description */}
@@ -96,14 +173,41 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
           {isAnalyzing && <Loader className="h-4 w-4 text-blue-600 animate-spin" />}
         </div>
         
-        <textarea
-          value={freeText}
-          onChange={handleTextChange}
-          placeholder={placeholder}
-          rows={4}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          maxLength={500}
-        />
+        <div className="relative">
+          <textarea
+            value={freeText}
+            onChange={handleTextChange}
+            placeholder={placeholder}
+            rows={4}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            maxLength={500}
+          />
+          
+          {/* Microphone button */}
+          <div className="absolute right-3 bottom-3">
+            {isRecording ? (
+              <button
+                onClick={handleStopRecording}
+                className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                aria-label="Stop recording"
+              >
+                <StopCircle className="h-5 w-5" />
+              </button>
+            ) : isProcessingSpeech ? (
+              <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
+                <Loader className="h-5 w-5 animate-spin" />
+              </div>
+            ) : (
+              <button
+                onClick={handleStartRecording}
+                className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                aria-label="Start recording"
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </div>
         
         <div className="flex justify-between items-center mt-1">
           <div className="text-xs text-gray-500">
@@ -115,6 +219,20 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
             </div>
           )}
         </div>
+        
+        {recordingError && (
+          <div className="mt-2 text-sm text-red-600 flex items-center space-x-1">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{recordingError}</span>
+          </div>
+        )}
+        
+        {isRecording && (
+          <div className="mt-2 text-sm text-blue-600 flex items-center space-x-1">
+            <span className="inline-block h-2 w-2 bg-red-600 rounded-full animate-pulse"></span>
+            <span>Recording... Click the stop button when finished.</span>
+          </div>
+        )}
       </div>
 
       {/* AI Analysis Results */}
