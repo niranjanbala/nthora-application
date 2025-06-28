@@ -164,24 +164,26 @@ export async function createUserProfile(
       ...profileData
     });
 
+    // Changed from insert to upsert to handle cases where the profile already exists
     const { data, error } = await supabase
       .from('user_profiles')
-      .insert({
+      .upsert({
         id: userId,
         email: email,
         ...profileData,
         role: 'pending',
-        membership_status: 'pending_approval'
+        membership_status: 'pending_approval',
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();
 
     if (error) {
-      console.error('createUserProfile - Insert error:', error);
+      console.error('createUserProfile - Upsert error:', error);
       return { success: false, error: error.message };
     }
 
-    console.log('createUserProfile - Profile created successfully:', data);
+    console.log('createUserProfile - Profile created/updated successfully:', data);
     return { success: true, profile: data };
   } catch (error) {
     console.error('createUserProfile - Unexpected error:', error);
