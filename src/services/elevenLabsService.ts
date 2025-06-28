@@ -25,7 +25,7 @@ class ElevenLabsService {
       const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
         body: { 
           text, 
-          voiceId: voiceId || 'default' 
+          voiceId: voiceId || undefined 
         }
       });
 
