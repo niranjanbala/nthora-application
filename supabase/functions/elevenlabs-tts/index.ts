@@ -28,10 +28,10 @@ serve(async (req) => {
       )
     }
 
-    const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY')
+    const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY_TTS')
     if (!elevenLabsApiKey) {
       return new Response(
-        JSON.stringify({ error: 'ElevenLabs API key not configured' }),
+        JSON.stringify({ error: 'ElevenLabs TTS API key not configured' }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
