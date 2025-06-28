@@ -365,6 +365,35 @@ Respond in JSON format:
       throw new Error('Failed to parse OpenAI response');
     }
   }
+
+  async generateText(prompt: string): Promise<{
+    success: boolean;
+    text?: string;
+    error?: string;
+  }> {
+    const response = await this.makeRequest('/chat/completions', {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    });
+
+    if (!response.success) {
+      return { success: false, error: response.error };
+    }
+
+    try {
+      const text = response.data.choices[0].message.content;
+      return { success: true, text };
+    } catch (error) {
+      return { success: false, error: 'Failed to parse OpenAI response' };
+    }
+  }
 }
 
 // Secure server-side service using Supabase Edge Functions
@@ -421,6 +450,18 @@ export class SecureOpenAIService {
   async analyzeQuestionSecure(title: string, content: string) {
     const { data, error } = await supabase.functions.invoke('analyze-question', {
       body: { title, content }
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  async generateTextSecure(prompt: string) {
+    const { data, error } = await supabase.functions.invoke('generate-text', {
+      body: { prompt }
     });
 
     if (error) {

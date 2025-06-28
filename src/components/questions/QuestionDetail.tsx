@@ -13,7 +13,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   Star,
-  User
+  User,
+  Bot,
+  Sparkles,
+  Zap,
+  Shield,
+  AlertCircle
 } from 'lucide-react';
 import { 
   Question, 
@@ -21,7 +26,8 @@ import {
   getQuestionById,
   getQuestionResponses,
   respondToQuestion,
-  markResponseHelpful
+  markResponseHelpful,
+  generateAgenticResponse
 } from '../../services/questionRoutingService';
 import { getCurrentUser } from '../../services/authService';
 
@@ -37,6 +43,8 @@ const QuestionDetail: React.FC = () => {
   const [responseContent, setResponseContent] = useState('');
   const [responseType, setResponseType] = useState<'tactical' | 'strategic' | 'resource' | 'introduction' | 'brainstorming'>('tactical');
   const [error, setError] = useState<string | null>(null);
+  const [generatingAgentic, setGeneratingAgentic] = useState<'low' | 'medium' | 'high' | null>(null);
+  const [showAgenticControls, setShowAgenticControls] = useState(false);
 
   useEffect(() => {
     if (questionId) {
@@ -102,6 +110,27 @@ const QuestionDetail: React.FC = () => {
     }
   };
 
+  const handleGenerateAgenticResponse = async (qualityLevel: 'low' | 'medium' | 'high') => {
+    if (!questionId) return;
+
+    setGeneratingAgentic(qualityLevel);
+    setError(null);
+
+    try {
+      const result = await generateAgenticResponse(questionId, qualityLevel);
+      
+      if (result.success) {
+        await loadQuestionData(); // Reload to show new response
+      } else {
+        setError(result.error || 'Failed to generate response');
+      }
+    } catch (error) {
+      setError('An unexpected error occurred');
+    } finally {
+      setGeneratingAgentic(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -140,6 +169,64 @@ const QuestionDetail: React.FC = () => {
       case 'third_degree': return <Users className="h-3 w-3" />;
       default: return <Lock className="h-3 w-3" />;
     }
+  };
+
+  const getSourceTypeIcon = (sourceType: string) => {
+    switch (sourceType) {
+      case 'human': return <User className="h-4 w-4" />;
+      case 'agentic_human': return <Bot className="h-4 w-4" />;
+      default: return <User className="h-4 w-4" />;
+    }
+  };
+
+  const getSourceTypeLabel = (sourceType: string) => {
+    switch (sourceType) {
+      case 'human': return 'Human';
+      case 'agentic_human': return 'AI Assistant';
+      default: return 'Unknown';
+    }
+  };
+
+  const getQualityLevelBadge = (qualityLevel?: string) => {
+    if (!qualityLevel) return null;
+    
+    switch (qualityLevel) {
+      case 'low':
+        return (
+          <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+            <AlertCircle className="h-3 w-3" />
+            <span>Basic</span>
+          </span>
+        );
+      case 'medium':
+        return (
+          <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+            <Zap className="h-3 w-3" />
+            <span>Good</span>
+          </span>
+        );
+      case 'high':
+        return (
+          <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+            <Sparkles className="h-3 w-3" />
+            <span>Expert</span>
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getResponseBackground = (response: QuestionResponse) => {
+    if (response.source_type === 'agentic_human') {
+      switch (response.quality_level) {
+        case 'low': return 'bg-red-50 border-red-200';
+        case 'medium': return 'bg-yellow-50 border-yellow-200';
+        case 'high': return 'bg-green-50 border-green-200';
+        default: return 'bg-blue-50 border-blue-200';
+      }
+    }
+    return 'bg-surface-50 border-surface-200';
   };
 
   if (loading) {
@@ -279,13 +366,81 @@ const QuestionDetail: React.FC = () => {
           transition={{ duration: 0.3, delay: 0.1 }}
         >
           {!showResponseForm ? (
-            <button
-              onClick={() => setShowResponseForm(true)}
-              className="w-full btn-primary py-3"
-            >
-              <MessageSquare className="h-5 w-5 mr-2" />
-              <span>Write a Response</span>
-            </button>
+            <div className="space-y-4">
+              <button
+                onClick={() => setShowResponseForm(true)}
+                className="w-full btn-primary py-3"
+              >
+                <MessageSquare className="h-5 w-5 mr-2" />
+                <span>Write a Response</span>
+              </button>
+              
+              {/* Agentic Response Controls */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setShowAgenticControls(!showAgenticControls)}
+                  className="text-accent-600 hover:text-accent-700 text-sm font-medium flex items-center space-x-1"
+                >
+                  <Bot className="h-4 w-4" />
+                  <span>{showAgenticControls ? 'Hide AI Options' : 'Show AI Options'}</span>
+                </button>
+                
+                {showAgenticControls && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleGenerateAgenticResponse('low')}
+                      disabled={generatingAgentic !== null}
+                      className="flex items-center space-x-1 px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-300 text-sm"
+                    >
+                      {generatingAgentic === 'low' ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700"></div>
+                      ) : (
+                        <AlertCircle className="h-4 w-4" />
+                      )}
+                      <span>Basic AI</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleGenerateAgenticResponse('medium')}
+                      disabled={generatingAgentic !== null}
+                      className="flex items-center space-x-1 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors duration-300 text-sm"
+                    >
+                      {generatingAgentic === 'medium' ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-700"></div>
+                      ) : (
+                        <Zap className="h-4 w-4" />
+                      )}
+                      <span>Good AI</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleGenerateAgenticResponse('high')}
+                      disabled={generatingAgentic !== null}
+                      className="flex items-center space-x-1 px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors duration-300 text-sm"
+                    >
+                      {generatingAgentic === 'high' ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700"></div>
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                      <span>Expert AI</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {showAgenticControls && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                  <div className="flex items-start space-x-2">
+                    <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <p>
+                      AI options generate responses of varying quality to demonstrate how the system works. 
+                      These responses are clearly labeled and help showcase the difference between human and AI-generated content.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-ink-dark">Your Response</h3>
@@ -384,20 +539,25 @@ const QuestionDetail: React.FC = () => {
             {responses.map((response, index) => (
               <motion.div 
                 key={response.id} 
-                className="border border-surface-200 rounded-lg p-4 bg-surface-50"
+                className={`border rounded-lg p-4 ${getResponseBackground(response)}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.1 * index }}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-surface-100 rounded-full flex items-center justify-center">
-                      <User className="h-4 w-4 text-ink-base" />
+                    <div className={`w-8 h-8 ${response.source_type === 'agentic_human' ? 'bg-blue-100' : 'bg-surface-100'} rounded-full flex items-center justify-center`}>
+                      {getSourceTypeIcon(response.source_type)}
                     </div>
                     <div>
-                      <p className="font-medium text-ink-dark">
-                        {(response as any).responder?.full_name || 'Anonymous'}
-                      </p>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-ink-dark">
+                          {(response as any).responder?.full_name || 'Anonymous'}
+                        </p>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${response.source_type === 'agentic_human' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                          {getSourceTypeLabel(response.source_type)}
+                        </span>
+                      </div>
                       <p className="text-sm text-ink-light">{formatDate(response.created_at)}</p>
                     </div>
                   </div>
@@ -406,6 +566,7 @@ const QuestionDetail: React.FC = () => {
                     <span className="bg-surface-100 text-ink-base px-2 py-1 rounded-full text-xs font-medium border border-surface-200 capitalize">
                       {response.response_type}
                     </span>
+                    {response.quality_level && getQualityLevelBadge(response.quality_level)}
                     {response.is_marked_helpful && (
                       <Star className="h-4 w-4 text-clay-500 fill-current" />
                     )}
@@ -436,7 +597,7 @@ const QuestionDetail: React.FC = () => {
                   
                   {response.quality_score && (
                     <div className="text-sm text-ink-light">
-                      Quality: {Math.round(response.quality_score)}%
+                      Quality: {Math.round(response.quality_score * 100)}%
                     </div>
                   )}
                 </div>

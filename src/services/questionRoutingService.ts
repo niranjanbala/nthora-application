@@ -54,6 +54,8 @@ export interface QuestionResponse {
   visible_to: string[];
   created_at: string;
   updated_at: string;
+  source_type: 'human' | 'agentic_human';
+  quality_level?: 'low' | 'medium' | 'high';
 }
 
 export interface UserExpertise {
@@ -322,7 +324,9 @@ export async function getMatchedQuestions(): Promise<(Question & { match_info: Q
 export async function respondToQuestion(
   questionId: string,
   content: string,
-  responseType: 'tactical' | 'strategic' | 'resource' | 'introduction' | 'brainstorming'
+  responseType: 'tactical' | 'strategic' | 'resource' | 'introduction' | 'brainstorming',
+  sourceType: 'human' | 'agentic_human' = 'human',
+  qualityLevel?: 'low' | 'medium' | 'high'
 ): Promise<{ success: boolean; response_id?: string; error?: string }> {
   try {
     const { data: user } = await supabase.auth.getUser();
@@ -336,7 +340,9 @@ export async function respondToQuestion(
         question_id: questionId,
         responder_id: user.user.id,
         content,
-        response_type: responseType
+        response_type: responseType,
+        source_type: sourceType,
+        quality_level: qualityLevel
       })
       .select()
       .single();
@@ -357,6 +363,70 @@ export async function respondToQuestion(
     return { success: true, response_id: data.id };
   } catch (error) {
     return { success: false, error: 'Failed to submit response' };
+  }
+}
+
+// Generate agentic response to a question
+export async function generateAgenticResponse(
+  questionId: string,
+  qualityLevel: 'low' | 'medium' | 'high'
+): Promise<{ success: boolean; response_id?: string; error?: string }> {
+  try {
+    // Get question details
+    const question = await getQuestionById(questionId);
+    if (!question) {
+      return { success: false, error: 'Question not found' };
+    }
+
+    // Generate response content based on quality level
+    const prompt = `
+You are an expert in ${question.primary_tags.join(', ')}. 
+Please provide a ${qualityLevel} quality response to the following question:
+
+Title: ${question.title}
+Question: ${question.content}
+
+${qualityLevel === 'low' ? 
+  'Keep your answer brief, somewhat vague, and provide only basic information. Include some minor inaccuracies.' : 
+  qualityLevel === 'medium' ? 
+  'Provide a balanced answer with good information but not too detailed. Include some helpful points but leave room for improvement.' : 
+  'Provide an exceptional, detailed, and highly accurate response. Include specific examples, actionable advice, and demonstrate deep expertise.'}
+
+Response type: ${question.expected_answer_type}
+`;
+
+    // Call OpenAI to generate the response
+    const response = await openaiService.generateText(prompt);
+    
+    if (!response.success || !response.text) {
+      return { success: false, error: response.error || 'Failed to generate response' };
+    }
+
+    // Calculate quality score based on quality level
+    const qualityScore = qualityLevel === 'low' ? 0.3 : 
+                         qualityLevel === 'medium' ? 0.6 : 0.9;
+
+    // Insert the agentic response
+    const result = await respondToQuestion(
+      questionId,
+      response.text,
+      question.expected_answer_type,
+      'agentic_human',
+      qualityLevel
+    );
+
+    // If successful, update the quality score
+    if (result.success && result.response_id) {
+      await supabase
+        .from('question_responses')
+        .update({ quality_score: qualityScore })
+        .eq('id', result.response_id);
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error generating agentic response:', error);
+    return { success: false, error: 'Failed to generate response' };
   }
 }
 

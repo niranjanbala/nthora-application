@@ -7,6 +7,7 @@ import Dashboard from './components/platform/Dashboard';
 import QuestionDetail from './components/questions/QuestionDetail';
 import InviteRegistration from './components/membership/InviteRegistration';
 import Onboarding from './pages/Onboarding';
+import OnboardingDemo from './pages/OnboardingDemo';
 
 function App() {
   return (
@@ -53,6 +54,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Onboarding />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/demo" 
+            element={
+              <ProtectedRoute>
+                <OnboardingDemo />
               </ProtectedRoute>
             } 
           />

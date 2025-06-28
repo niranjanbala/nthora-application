@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import OnboardingFlow from '../components/onboarding/OnboardingFlow';
+import OnboardingDemo from './OnboardingDemo';
 import { createUserProfile, getCurrentUser } from '../services/authService';
 import { updateUserExpertise } from '../services/questionRoutingService';
 
@@ -11,9 +12,14 @@ const Onboarding: React.FC = () => {
   
   // Get early user data from location state if available
   const { earlyUserData, verifiedEmail } = location.state || {};
+  
+  // State to track onboarding completion and show demo
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [onboardingData, setOnboardingData] = useState<any>(null);
 
   const handleOnboardingComplete = async (data: any) => {
     console.log('Onboarding completed with data:', data);
+    setOnboardingData(data);
     
     try {
       // Get the current authenticated user
@@ -93,10 +99,10 @@ const Onboarding: React.FC = () => {
         }
       }
 
-      console.log('Onboarding completed successfully, redirecting to dashboard...');
+      console.log('Onboarding completed successfully, showing demo...');
       
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Show the demo instead of redirecting immediately
+      setOnboardingCompleted(true);
       
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -104,14 +110,28 @@ const Onboarding: React.FC = () => {
     }
   };
 
+  const handleDemoComplete = () => {
+    // Redirect to dashboard after demo
+    navigate('/dashboard');
+  };
+
   return (
-    <OnboardingFlow
-      onComplete={handleOnboardingComplete}
-      inviteCode={inviteCode}
-      initialOnboardingData={earlyUserData}
-      verifiedEmail={verifiedEmail}
-      inviterName={earlyUserData?.referred_by ? "Referring User" : undefined} // In a real app, you'd fetch the inviter's name
-    />
+    <>
+      {!onboardingCompleted ? (
+        <OnboardingFlow
+          onComplete={handleOnboardingComplete}
+          inviteCode={inviteCode}
+          initialOnboardingData={earlyUserData}
+          verifiedEmail={verifiedEmail}
+          inviterName={earlyUserData?.referred_by ? "Referring User" : undefined} // In a real app, you'd fetch the inviter's name
+        />
+      ) : (
+        <OnboardingDemo 
+          onComplete={handleDemoComplete}
+          currentStruggles={onboardingData?.currentStruggles}
+        />
+      )}
+    </>
   );
 };
 
