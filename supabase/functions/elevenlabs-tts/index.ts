@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voiceId = 'EXAVITQu4vr4xnSDxMaL' }: TTSRequest = await req.json()
+    const { text, voiceId = 'UgBBYS2sOqTuMpoF3BR0' }: TTSRequest = await req.json()
 
     if (!text) {
       return new Response(
