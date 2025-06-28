@@ -469,6 +469,8 @@ export async function updateUserExpertise(
         is_available: isAvailable,
         max_questions_per_week: maxQuestionsPerWeek,
         last_active: new Date().toISOString()
+      }, {
+        onConflict: 'user_id,expertise_tag'
       });
 
     if (error) {

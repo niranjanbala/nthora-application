@@ -7,6 +7,7 @@ import {
   Sparkles, 
   Bot, 
   User, 
+  Users,
   ThumbsUp, 
   ThumbsDown, 
   AlertCircle, 
