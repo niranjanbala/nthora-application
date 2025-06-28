@@ -7,6 +7,7 @@ import AIHelpTopicsInput from './AIHelpTopicsInput';
 import CategoryUnlockFlow from './CategoryUnlockFlow';
 
 interface OnboardingData {
+  fullName: string;
   primaryRole: string;
   additionalRoles: string[];
   industries: string[];
@@ -40,6 +41,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [data, setData] = useState<OnboardingData>({
+    fullName: '',
     primaryRole: '',
     additionalRoles: [],
     industries: [],
@@ -174,7 +176,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return data.primaryRole && data.industries.length > 0;
+      case 1: return data.fullName && data.primaryRole && data.industries.length > 0;
       case 2: return data.expertiseAreas.length > 0;
       case 3: return data.helpTopics.length > 0;
       case 4: return true; // Network unlock step is optional
@@ -231,6 +233,21 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             <div className="text-center">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Tell us about yourself</h2>
               <p className="text-gray-600">This helps us personalize your experience and suggest relevant connections.</p>
+            </div>
+
+            {/* Full Name Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                value={data.fullName}
+                onChange={(e) => updateData({ fullName: e.target.value })}
+                placeholder="Your full name"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                required
+              />
             </div>
 
             <AIRoleInput
