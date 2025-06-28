@@ -146,7 +146,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
   };
 
   const handleProcessRecording = async () => {
-    console.log("stopped recording");
+  
 
     if (audioChunks.length === 0) return;
     
