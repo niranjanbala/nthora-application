@@ -149,6 +149,24 @@ const UserProfile: React.FC<UserProfileProps> = ({
     return userProfile?.role || user.role;
   };
 
+  // Safely access user stats with fallbacks
+  const getUserStats = () => {
+    // First try to get stats from userProfile if available
+    if (userProfile?.stats) {
+      return userProfile.stats;
+    }
+    
+    // Otherwise use the default mock stats
+    return {
+      questionsAsked: 12,
+      questionsAnswered: 28,
+      helpfulVotes: 45,
+      networkSize: 156
+    };
+  };
+
+  const userStats = getUserStats();
+
   return (
     <div className="space-y-6">
       {/* Profile Header */}
@@ -213,28 +231,28 @@ const UserProfile: React.FC<UserProfileProps> = ({
           <div className="bg-gray-50 rounded-lg p-3 text-center">
             <div className="flex items-center justify-center space-x-1 mb-1">
               <MessageSquare className="h-4 w-4 text-blue-600" />
-              <span className="text-lg font-bold text-gray-900">{user.stats.questionsAsked}</span>
+              <span className="text-lg font-bold text-gray-900">{userStats.questionsAsked}</span>
             </div>
             <div className="text-xs text-gray-600">Questions Asked</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-center">
             <div className="flex items-center justify-center space-x-1 mb-1">
               <MessageSquare className="h-4 w-4 text-purple-600" />
-              <span className="text-lg font-bold text-gray-900">{user.stats.questionsAnswered}</span>
+              <span className="text-lg font-bold text-gray-900">{userStats.questionsAnswered}</span>
             </div>
             <div className="text-xs text-gray-600">Answers Given</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-center">
             <div className="flex items-center justify-center space-x-1 mb-1">
               <Star className="h-4 w-4 text-yellow-500" />
-              <span className="text-lg font-bold text-gray-900">{user.stats.helpfulVotes}</span>
+              <span className="text-lg font-bold text-gray-900">{userStats.helpfulVotes}</span>
             </div>
             <div className="text-xs text-gray-600">Helpful Votes</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-center">
             <div className="flex items-center justify-center space-x-1 mb-1">
               <Users className="h-4 w-4 text-green-600" />
-              <span className="text-lg font-bold text-gray-900">{user.stats.networkSize}</span>
+              <span className="text-lg font-bold text-gray-900">{userStats.networkSize}</span>
             </div>
             <div className="text-xs text-gray-600">Network Size</div>
           </div>
