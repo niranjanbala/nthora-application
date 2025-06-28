@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   ArrowLeft, 
   Clock, 
@@ -114,21 +115,21 @@ const QuestionDetail: React.FC = () => {
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
-      case 'urgent': return 'text-red-600 bg-red-100';
-      case 'high': return 'text-orange-600 bg-orange-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'low': return 'text-green-600 bg-green-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'urgent': return 'text-blush-700 bg-blush-50 border-blush-200';
+      case 'high': return 'text-clay-700 bg-clay-50 border-clay-200';
+      case 'medium': return 'text-accent-700 bg-accent-50 border-accent-200';
+      case 'low': return 'text-sage-700 bg-sage-50 border-sage-200';
+      default: return 'text-ink-light bg-surface-100 border-surface-200';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'text-blue-600 bg-blue-100';
-      case 'answered': return 'text-green-600 bg-green-100';
-      case 'closed': return 'text-gray-600 bg-gray-100';
-      case 'forwarded': return 'text-purple-600 bg-purple-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'active': return 'text-accent-700 bg-accent-50 border-accent-200';
+      case 'answered': return 'text-sage-700 bg-sage-50 border-sage-200';
+      case 'closed': return 'text-ink-light bg-surface-100 border-surface-200';
+      case 'forwarded': return 'text-clay-700 bg-clay-50 border-clay-200';
+      default: return 'text-ink-light bg-surface-100 border-surface-200';
     }
   };
 
@@ -143,11 +144,11 @@ const QuestionDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-soft border border-surface-200 p-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+          <div className="h-6 bg-surface-200 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-surface-200 rounded w-full mb-2"></div>
+          <div className="h-4 bg-surface-200 rounded w-2/3"></div>
         </div>
       </div>
     );
@@ -155,13 +156,13 @@ const QuestionDetail: React.FC = () => {
 
   if (!question) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-        <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Question not found</h3>
-        <p className="text-gray-600 mb-4">The question you're looking for doesn't exist or you don't have access to it.</p>
+      <div className="bg-white rounded-xl shadow-soft border border-surface-200 p-12 text-center">
+        <MessageSquare className="h-12 w-12 text-surface-300 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-ink-dark mb-2">Question not found</h3>
+        <p className="text-ink-light mb-4">The question you're looking for doesn't exist or you don't have access to it.</p>
         <button
           onClick={() => navigate('/dashboard')}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors duration-300"
+          className="btn-primary"
         >
           Back to Dashboard
         </button>
@@ -175,28 +176,33 @@ const QuestionDetail: React.FC = () => {
       <div className="flex items-center space-x-4">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 text-gray-400 hover:text-gray-600 transition-colors duration-300"
+          className="p-2 text-ink-light hover:text-ink-dark transition-colors duration-300"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Question Details</h1>
-          <p className="text-gray-600">View and respond to this question</p>
+          <h1 className="text-2xl font-medium text-ink-dark">Question Details</h1>
+          <p className="text-ink-light">View and respond to this question</p>
         </div>
       </div>
 
       {/* Question Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <motion.div 
+        className="bg-white rounded-xl shadow-soft border border-surface-200 p-6"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
-              <h2 className="text-xl font-semibold text-gray-900">{question.title}</h2>
+              <h2 className="text-xl font-medium text-ink-dark">{question.title}</h2>
               {question.is_sensitive && (
-                <AlertTriangle className="h-5 w-5 text-orange-500 flex-shrink-0" />
+                <AlertTriangle className="h-5 w-5 text-clay-500 flex-shrink-0" />
               )}
             </div>
             
-            <div className="prose max-w-none text-gray-700 mb-4">
+            <div className="prose max-w-none text-ink-base mb-4">
               <p className="whitespace-pre-wrap">{question.content}</p>
             </div>
             
@@ -206,7 +212,7 @@ const QuestionDetail: React.FC = () => {
                 {question.primary_tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium"
+                    className="bg-accent-50 text-accent-700 px-3 py-1 rounded-full text-sm font-medium border border-accent-200"
                   >
                     {tag}
                   </span>
@@ -214,7 +220,7 @@ const QuestionDetail: React.FC = () => {
                 {question.secondary_tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm"
+                    className="bg-surface-50 text-ink-light px-3 py-1 rounded-full text-sm border border-surface-200"
                   >
                     {tag}
                   </span>
@@ -224,17 +230,17 @@ const QuestionDetail: React.FC = () => {
           </div>
           
           <div className="flex flex-col items-end space-y-2 ml-4">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(question.status)}`}>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(question.status)}`}>
               {question.status}
             </span>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getUrgencyColor(question.urgency_level)}`}>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getUrgencyColor(question.urgency_level)}`}>
               {question.urgency_level}
             </span>
           </div>
         </div>
 
         {/* Question Metadata */}
-        <div className="flex items-center justify-between text-sm text-gray-600 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between text-sm text-ink-light pt-4 border-t border-surface-200">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-1">
               <Clock className="h-4 w-4" />
@@ -262,31 +268,36 @@ const QuestionDetail: React.FC = () => {
             <span className="capitalize">{question.expected_answer_type}</span>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Response Form */}
       {currentUser && question.status === 'active' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <motion.div 
+          className="bg-white rounded-xl shadow-soft border border-surface-200 p-6"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
           {!showResponseForm ? (
             <button
               onClick={() => setShowResponseForm(true)}
-              className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors duration-300"
+              className="w-full btn-primary py-3"
             >
-              <MessageSquare className="h-5 w-5" />
+              <MessageSquare className="h-5 w-5 mr-2" />
               <span>Write a Response</span>
             </button>
           ) : (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Your Response</h3>
+              <h3 className="text-lg font-medium text-ink-dark">Your Response</h3>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-light mb-2">
                   Response Type
                 </label>
                 <select
                   value={responseType}
                   onChange={(e) => setResponseType(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="input"
                 >
                   <option value="tactical">Tactical - How-to guidance</option>
                   <option value="strategic">Strategic - High-level approach</option>
@@ -297,7 +308,7 @@ const QuestionDetail: React.FC = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-light mb-2">
                   Your Answer
                 </label>
                 <textarea
@@ -305,17 +316,17 @@ const QuestionDetail: React.FC = () => {
                   onChange={(e) => setResponseContent(e.target.value)}
                   placeholder="Share your expertise and help answer this question..."
                   rows={6}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                  className="input resize-none"
                   maxLength={2000}
                 />
-                <div className="text-right text-xs text-gray-500 mt-1">
+                <div className="text-right text-xs text-ink-light mt-1">
                   {responseContent.length}/2000
                 </div>
               </div>
 
               {error && (
-                <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
-                  <AlertTriangle className="h-5 w-5" />
+                <div className="flex items-center space-x-2 text-blush-700 bg-blush-50 p-3 rounded-lg border border-blush-200">
+                  <AlertTriangle className="h-5 w-5 flex-shrink-0" />
                   <span className="text-sm">{error}</span>
                 </div>
               )}
@@ -324,14 +335,16 @@ const QuestionDetail: React.FC = () => {
                 <button
                   onClick={handleSubmitResponse}
                   disabled={responseLoading || !responseContent.trim()}
-                  className="flex items-center space-x-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors duration-300"
+                  className="btn-primary"
                 >
                   {responseLoading ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   ) : (
-                    <Send className="h-5 w-5" />
+                    <>
+                      <Send className="h-5 w-5 mr-2" />
+                      <span>Submit Response</span>
+                    </>
                   )}
-                  <span>{responseLoading ? 'Submitting...' : 'Submit Response'}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -339,56 +352,67 @@ const QuestionDetail: React.FC = () => {
                     setResponseContent('');
                     setError(null);
                   }}
-                  className="bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-colors duration-300"
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* Responses */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <motion.div 
+        className="bg-white rounded-xl shadow-soft border border-surface-200 p-6"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
+        <h3 className="text-lg font-medium text-ink-dark mb-4">
           Responses ({responses.length})
         </h3>
         
         {responses.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center py-8 text-ink-light">
+            <MessageSquare className="h-12 w-12 mx-auto mb-4 text-surface-300" />
             <p>No responses yet</p>
             <p className="text-sm">Be the first to help answer this question!</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {responses.map((response) => (
-              <div key={response.id} className="border border-gray-200 rounded-lg p-4">
+            {responses.map((response, index) => (
+              <motion.div 
+                key={response.id} 
+                className="border border-surface-200 rounded-lg p-4 bg-surface-50"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 * index }}
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                      <User className="h-4 w-4 text-purple-600" />
+                    <div className="w-8 h-8 bg-surface-100 rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-ink-base" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-ink-dark">
                         {(response as any).responder?.full_name || 'Anonymous'}
                       </p>
-                      <p className="text-sm text-gray-600">{formatDate(response.created_at)}</p>
+                      <p className="text-sm text-ink-light">{formatDate(response.created_at)}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium capitalize">
+                    <span className="bg-surface-100 text-ink-base px-2 py-1 rounded-full text-xs font-medium border border-surface-200 capitalize">
                       {response.response_type}
                     </span>
                     {response.is_marked_helpful && (
-                      <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                      <Star className="h-4 w-4 text-clay-500 fill-current" />
                     )}
                   </div>
                 </div>
                 
-                <div className="prose max-w-none text-gray-700 mb-3">
+                <div className="prose max-w-none text-ink-base mb-3">
                   <p className="whitespace-pre-wrap">{response.content}</p>
                 </div>
                 
@@ -396,14 +420,14 @@ const QuestionDetail: React.FC = () => {
                   <div className="flex items-center space-x-4">
                     <button
                       onClick={() => handleVoteResponse(response.id, true)}
-                      className="flex items-center space-x-1 text-gray-600 hover:text-green-600 transition-colors duration-300"
+                      className="flex items-center space-x-1 text-ink-light hover:text-sage-600 transition-colors duration-300"
                     >
                       <ThumbsUp className="h-4 w-4" />
                       <span className="text-sm">{response.helpful_votes}</span>
                     </button>
                     <button
                       onClick={() => handleVoteResponse(response.id, false)}
-                      className="flex items-center space-x-1 text-gray-600 hover:text-red-600 transition-colors duration-300"
+                      className="flex items-center space-x-1 text-ink-light hover:text-blush-600 transition-colors duration-300"
                     >
                       <ThumbsDown className="h-4 w-4" />
                       <span className="text-sm">{response.unhelpful_votes}</span>
@@ -411,16 +435,16 @@ const QuestionDetail: React.FC = () => {
                   </div>
                   
                   {response.quality_score && (
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-ink-light">
                       Quality: {Math.round(response.quality_score)}%
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Clock, Users, ArrowRight, Tag, AlertTriangle, Lock, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Clock, Users, MessageSquare, Tag, AlertTriangle, Lock, Plus, ArrowRight } from 'lucide-react';
 import { 
   getUserQuestions, 
   getMatchedQuestions, 
@@ -60,21 +61,21 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
-      case 'urgent': return 'text-red-600 bg-red-100';
-      case 'high': return 'text-orange-600 bg-orange-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'low': return 'text-green-600 bg-green-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'urgent': return 'text-blush-700 bg-blush-50 border-blush-200';
+      case 'high': return 'text-clay-700 bg-clay-50 border-clay-200';
+      case 'medium': return 'text-accent-700 bg-accent-50 border-accent-200';
+      case 'low': return 'text-sage-700 bg-sage-50 border-sage-200';
+      default: return 'text-ink-light bg-surface-100 border-surface-200';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'text-blue-600 bg-blue-100';
-      case 'answered': return 'text-green-600 bg-green-100';
-      case 'closed': return 'text-gray-600 bg-gray-100';
-      case 'forwarded': return 'text-purple-600 bg-purple-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'active': return 'text-accent-700 bg-accent-50 border-accent-200';
+      case 'answered': return 'text-sage-700 bg-sage-50 border-sage-200';
+      case 'closed': return 'text-ink-light bg-surface-100 border-surface-200';
+      case 'forwarded': return 'text-clay-700 bg-clay-50 border-clay-200';
+      default: return 'text-ink-light bg-surface-100 border-surface-200';
     }
   };
 
@@ -138,14 +139,29 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
     }
   };
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+          <div key={i} className="bg-white rounded-xl shadow-soft border border-surface-200 p-6 animate-pulse">
+            <div className="h-6 bg-surface-200 rounded w-3/4 mb-4"></div>
+            <div className="h-4 bg-surface-200 rounded w-full mb-2"></div>
+            <div className="h-4 bg-surface-200 rounded w-2/3"></div>
           </div>
         ))}
       </div>
@@ -155,20 +171,25 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
   if (questions.length === 0) {
     const emptyState = getEmptyStateMessage();
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-        <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyState.title}</h3>
-        <p className="text-gray-600 mb-6">{emptyState.description}</p>
+      <motion.div 
+        className="bg-white rounded-xl shadow-soft border border-surface-200 p-12 text-center"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <MessageSquare className="h-12 w-12 text-surface-300 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-ink-dark mb-2">{emptyState.title}</h3>
+        <p className="text-ink-light mb-6">{emptyState.description}</p>
         {emptyState.action && emptyState.actionHandler && (
           <button
             onClick={emptyState.actionHandler}
-            className="inline-flex items-center space-x-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors duration-300"
+            className="btn-primary inline-flex items-center"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-5 w-5 mr-2" />
             <span>{emptyState.action}</span>
           </button>
         )}
-      </div>
+      </motion.div>
     );
   }
 
@@ -177,34 +198,40 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">{getViewTitle()}</h2>
-          <p className="text-gray-600">{getViewDescription()}</p>
+          <h2 className="text-2xl font-medium text-ink-dark">{getViewTitle()}</h2>
+          <p className="text-ink-light">{getViewDescription()}</p>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-ink-light">
           {questions.length} question{questions.length !== 1 ? 's' : ''}
         </div>
       </div>
 
       {/* Questions List */}
-      <div className="space-y-4">
+      <motion.div 
+        className="space-y-4"
+        variants={container}
+        initial="hidden"
+        animate="show"
+      >
         {questions.map((question) => (
-          <div
+          <motion.div
             key={question.id}
+            variants={item}
             onClick={() => handleQuestionClick(question.id)}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-200 transition-all duration-300 cursor-pointer"
+            className="bg-white rounded-xl shadow-soft border border-surface-200 p-6 hover:shadow-medium hover:border-accent-200 transition-all duration-300 cursor-pointer"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 hover:text-purple-600 transition-colors duration-300">
+                  <h3 className="text-lg font-medium text-ink-dark line-clamp-2 hover:text-accent-600 transition-colors duration-300">
                     {question.title}
                   </h3>
                   {question.is_sensitive && (
-                    <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                    <AlertTriangle className="h-4 w-4 text-clay-500 flex-shrink-0" />
                   )}
                 </div>
                 
-                <p className="text-gray-700 line-clamp-3 mb-3">
+                <p className="text-ink-base line-clamp-3 mb-3">
                   {question.content}
                 </p>
                 
@@ -214,7 +241,7 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
                     {question.primary_tags.slice(0, 3).map((tag, index) => (
                       <span
                         key={index}
-                        className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
+                        className="bg-accent-50 text-accent-700 px-2 py-1 rounded-full text-xs font-medium border border-accent-200"
                       >
                         {tag}
                       </span>
@@ -222,13 +249,13 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
                     {question.secondary_tags.slice(0, 2).map((tag, index) => (
                       <span
                         key={index}
-                        className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs"
+                        className="bg-surface-50 text-ink-light px-2 py-1 rounded-full text-xs border border-surface-200"
                       >
                         {tag}
                       </span>
                     ))}
                     {(question.primary_tags.length + question.secondary_tags.length) > 5 && (
-                      <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs">
+                      <span className="bg-surface-50 text-ink-light px-2 py-1 rounded-full text-xs border border-surface-200">
                         +{(question.primary_tags.length + question.secondary_tags.length) - 5} more
                       </span>
                     )}
@@ -237,17 +264,17 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
               </div>
               
               <div className="flex flex-col items-end space-y-2 ml-4">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(question.status)}`}>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(question.status)}`}>
                   {question.status}
                 </span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(question.urgency_level)}`}>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getUrgencyColor(question.urgency_level)}`}>
                   {question.urgency_level}
                 </span>
               </div>
             </div>
 
             {/* Question Metadata */}
-            <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center justify-between text-sm text-ink-light">
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-1">
                   <Clock className="h-4 w-4" />
@@ -275,33 +302,33 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
                   <Tag className="h-4 w-4" />
                   <span className="capitalize">{question.expected_answer_type}</span>
                 </div>
-                <ArrowRight className="h-4 w-4 text-purple-600" />
+                <ArrowRight className="h-4 w-4 text-accent-600" />
               </div>
             </div>
 
             {/* Match Info for matched questions */}
             {view === 'matched_questions' && (question as any).match_info && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="bg-purple-50 rounded-lg p-3">
+              <div className="mt-4 pt-4 border-t border-surface-200">
+                <div className="bg-accent-50 rounded-lg p-3 border border-accent-200">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-purple-900">
+                      <p className="text-sm font-medium text-ink-dark">
                         Match Score: {Math.round((question as any).match_info.match_score * 100)}%
                       </p>
-                      <p className="text-xs text-purple-700">
+                      <p className="text-xs text-ink-light">
                         Matched based on your expertise in {question.primary_tags.slice(0, 2).join(', ')}
                       </p>
                     </div>
-                    <div className="bg-purple-600 text-white px-3 py-1 rounded-lg text-sm font-medium">
+                    <div className="bg-accent-600 text-white px-3 py-1 rounded-lg text-sm font-medium">
                       Answer
                     </div>
                   </div>
                 </div>
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 };

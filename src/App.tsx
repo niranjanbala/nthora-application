@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './components/platform/Dashboard';
@@ -10,7 +11,12 @@ import Onboarding from './pages/Onboarding';
 function App() {
   return (
     <Router>
-      <div className="font-sans">
+      <motion.div 
+        className="font-sans min-h-screen bg-surface-50 text-ink-base"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -55,7 +61,7 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </div>
+      </motion.div>
     </Router>
   );
 }

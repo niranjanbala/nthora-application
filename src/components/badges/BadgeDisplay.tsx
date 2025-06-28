@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Badge, BadgeTier, BadgeRarity } from '../../types/badges';
 import { BADGE_TIERS, BADGE_RARITIES } from '../../data/badges';
 
@@ -28,11 +29,12 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
 
   const getBadgeStyle = () => {
     const baseStyle = {
-      backgroundColor: badge.earnedAt ? tierConfig.color : '#E5E7EB',
+      backgroundColor: badge.earnedAt ? tierConfig.color + '20' : '#F5F5F5',
       boxShadow: badge.earnedAt 
-        ? `0 0 20px ${rarityConfig.glowColor}40, 0 0 40px ${rarityConfig.glowColor}20`
+        ? `0 0 10px ${rarityConfig.glowColor}20, 0 0 20px ${rarityConfig.glowColor}10`
         : 'none',
-      opacity: badge.earnedAt ? 1 : 0.5
+      opacity: badge.earnedAt ? 1 : 0.7,
+      borderColor: badge.earnedAt ? tierConfig.color + '40' : '#E5E5E5'
     };
 
     return baseStyle;
@@ -45,19 +47,21 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
 
   return (
     <div className="relative group">
-      <div
+      <motion.div
         className={`
           ${sizeClasses[size]} 
           rounded-full 
           flex items-center justify-center 
-          border-2 border-white 
+          border-2
           cursor-pointer 
           transition-all duration-300 
-          hover:scale-110 
+          hover:scale-105 
           ${badge.earnedAt ? 'animate-pulse-subtle' : ''}
         `}
         style={getBadgeStyle()}
         onClick={onClick}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
       >
         <span className="filter drop-shadow-sm">{badge.icon}</span>
         
@@ -68,7 +72,7 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
             style={{ backgroundColor: rarityConfig.glowColor }}
           />
         )}
-      </div>
+      </motion.div>
 
       {/* Progress ring for unearned badges */}
       {!badge.earnedAt && showProgress && badge.progress && (
@@ -77,14 +81,14 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
           viewBox="0 0 36 36"
         >
           <path
-            className="text-gray-300"
+            className="text-surface-200"
             stroke="currentColor"
             strokeWidth="2"
             fill="transparent"
             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
           />
           <path
-            className="text-purple-600"
+            className="text-accent-600"
             stroke="currentColor"
             strokeWidth="2"
             fill="transparent"
@@ -96,22 +100,22 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
 
       {/* Tooltip */}
       {showTooltip && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-          <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap">
-            <div className="font-semibold">{badge.name}</div>
-            <div className="text-gray-300">{badge.description}</div>
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none">
+          <div className="bg-ink-dark text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-medium">
+            <div className="font-medium">{badge.name}</div>
+            <div className="text-surface-300">{badge.description}</div>
             {badge.progress && !badge.earnedAt && (
-              <div className="text-purple-300 mt-1">
+              <div className="text-accent-300 mt-1">
                 {badge.progress.current}/{badge.progress.target}
               </div>
             )}
             {badge.earnedAt && (
-              <div className="text-green-300 mt-1">
+              <div className="text-sage-300 mt-1">
                 Earned {new Date(badge.earnedAt).toLocaleDateString()}
               </div>
             )}
           </div>
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-ink-dark"></div>
         </div>
       )}
     </div>
