@@ -6,11 +6,12 @@ import {
   getUserQuestions, 
   getMatchedQuestions, 
   getAllQuestions,
+  getExploreTopicsQuestions,
   type Question 
 } from '../../services/questionRoutingService';
 
 interface QuestionFeedProps {
-  view: 'my_questions' | 'matched_questions' | 'all';
+  view: 'my_questions' | 'matched_questions' | 'all' | 'explore_topics';
 }
 
 const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
@@ -32,6 +33,8 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
         data = matchedQuestions;
       } else if (view === 'my_questions') {
         data = await getUserQuestions();
+      } else if (view === 'explore_topics') {
+        data = await getExploreTopicsQuestions();
       } else {
         data = await getAllQuestions();
       }
@@ -92,6 +95,7 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
     switch (view) {
       case 'my_questions': return 'My Questions';
       case 'matched_questions': return 'Questions for You';
+      case 'explore_topics': return 'Explore Topics';
       case 'all': return 'All Questions';
       default: return 'Questions';
     }
@@ -101,6 +105,7 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
     switch (view) {
       case 'my_questions': return 'Questions you\'ve asked';
       case 'matched_questions': return 'Questions matched to your expertise';
+      case 'explore_topics': return 'Questions in your areas of interest and expertise';
       case 'all': return 'Recent questions from the community';
       default: return 'Browse questions';
     }
@@ -121,6 +126,13 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
           description: 'Questions that match your expertise will appear here',
           action: null,
           actionHandler: null
+        };
+      case 'explore_topics':
+        return {
+          title: 'No relevant questions found',
+          description: 'Add more expertise areas or help topics in your profile to see relevant questions',
+          action: 'Update Profile',
+          actionHandler: () => navigate('/dashboard?view=profile')
         };
       case 'all':
         return {

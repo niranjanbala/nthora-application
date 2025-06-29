@@ -231,6 +231,67 @@ export async function getAllQuestions(): Promise<Question[]> {
   }
 }
 
+// Get questions for explore topics feed
+export async function getExploreTopicsQuestions(): Promise<Question[]> {
+  try {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) return [];
+
+    // Get user profile to access expertise areas and help topics
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('expertise_areas, onboarding_details')
+      .eq('id', user.user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      return [];
+    }
+
+    // Extract expertise areas and help topics
+    const expertiseAreas = profile?.expertise_areas || [];
+    const helpTopics = profile?.onboarding_details?.helpTopics || [];
+    
+    // Combine all relevant tags
+    const relevantTags = [...expertiseAreas, ...helpTopics];
+    
+    if (relevantTags.length === 0) {
+      // If no tags, return recent questions
+      return await getAllQuestions();
+    }
+
+    // Query questions that match any of the relevant tags
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error fetching explore topics questions:', error);
+      return [];
+    }
+
+    // Filter questions that have matching tags
+    const matchedQuestions = (data || []).filter(question => {
+      const allTags = [...question.primary_tags, ...question.secondary_tags];
+      return allTags.some(tag => 
+        relevantTags.some(relevantTag => 
+          tag.toLowerCase().includes(relevantTag.toLowerCase()) ||
+          relevantTag.toLowerCase().includes(tag.toLowerCase())
+        )
+      );
+    });
+
+    return matchedQuestions;
+  } catch (error) {
+    console.error('Error fetching explore topics questions:', error);
+    return [];
+  }
+}
+
 // Get expert matches for a question
 export async function getQuestionMatches(questionId: string): Promise<QuestionMatch[]> {
   const { data, error } = await supabase

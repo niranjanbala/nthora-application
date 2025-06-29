@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User, LogOut } from 'lucide-react';
+import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User, LogOut, Compass } from 'lucide-react';
 import QuestionComposer from '../questions/QuestionComposer';
 import QuestionFeed from '../questions/QuestionFeed';
 import ExpertiseManager from '../questions/ExpertiseManager';
@@ -36,7 +36,8 @@ type DashboardView =
   | 'network_depth'
   | 'network_activity'
   | 'auto_skills'
-  | 'preferences';
+  | 'preferences'
+  | 'explore_topics';
 
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -68,6 +69,7 @@ const Dashboard: React.FC = () => {
 
   const navigationItems = [
     { id: 'feed', label: 'Feed', icon: MessageSquare, badge: null, description: 'Latest questions and activity' },
+    { id: 'explore_topics', label: 'Explore Topics', icon: Compass, badge: null, description: 'Questions in your areas of interest' },
     { id: 'ask_question', label: 'Ask Question', icon: Plus, badge: null, description: 'Get expert answers instantly' },
     { id: 'my_questions', label: 'My Questions', icon: MessageSquare, badge: null, description: 'Questions you\'ve asked' },
     { id: 'matched_questions', label: 'Answer Questions', icon: Users, badge: 2, description: 'Questions matched to your expertise' },
@@ -87,6 +89,8 @@ const Dashboard: React.FC = () => {
     switch (currentView) {
       case 'feed':
         return <QuestionFeed view="all" />;
+      case 'explore_topics':
+        return <QuestionFeed view="explore_topics" />;
       case 'ask_question':
         return <QuestionComposer onQuestionCreated={() => handleViewChange('my_questions')} />;
       case 'my_questions':
