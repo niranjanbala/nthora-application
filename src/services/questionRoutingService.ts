@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
 import { openaiService, secureOpenaiService } from './openaiService';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface Question {
   id: string;
@@ -457,6 +456,12 @@ I've seen this approach work well in similar situations. The key is to be flexib
 // Seed demo questions if they don't exist
 export async function seedDemoQuestions(): Promise<{ success: boolean; error?: string }> {
   try {
+    // Get current authenticated user
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
     // Check if demo questions already exist
     const { count } = await supabase
       .from('questions')
@@ -578,13 +583,13 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
       }
     ];
 
-    // Insert or update demo questions in the questions table
+    // Insert or update demo questions in the questions table using the current user's ID
     for (const question of demoQuestions) {
       const { data, error } = await supabase
         .from('questions')
         .upsert({
           ...question,
-          asker_id: uuidv4(), // Generate a proper UUID for each demo question
+          asker_id: user.user.id, // Use current user's ID instead of random UUID
           visibility_level: 'public',
           is_anonymous: false,
           is_sensitive: false,
