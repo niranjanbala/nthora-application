@@ -237,15 +237,14 @@ export async function getAllQuestions(): Promise<Question[]> {
 // Get demo questions
 export async function getDemoQuestions(category?: string): Promise<Question[]> {
   try {
+    // First try to get from demo_questions table
     let query = supabase
-      .from('questions')
+      .from('demo_questions')
       .select('*')
-      .eq('is_demo', true)
       .order('created_at', { ascending: false });
       
-    // Filter by category if provided (using primary_tags for category filtering)
+    // Filter by category if provided
     if (category && category !== 'all') {
-      // Map view categories to tag filters
       const categoryTagMap: { [key: string]: string[] } = {
         'my_questions': ['personal', 'career', 'development'],
         'matched_questions': ['expertise', 'consulting', 'advice'],
@@ -258,14 +257,67 @@ export async function getDemoQuestions(category?: string): Promise<Question[]> {
       }
     }
       
-    const { data, error } = await query.limit(20);
+    const { data: demoData, error: demoError } = await query.limit(20);
 
-    if (error) {
-      console.error('Error fetching demo questions:', error);
+    if (demoError) {
+      console.error('Error fetching demo questions from demo_questions table:', demoError);
+    }
+
+    // If we have demo questions from the demo_questions table, return them
+    if (demoData && demoData.length > 0) {
+      // Convert demo_questions format to Question format
+      return demoData.map(demo => ({
+        id: demo.id,
+        asker_id: 'demo-user',
+        title: demo.title,
+        content: demo.content,
+        primary_tags: demo.primary_tags || [],
+        secondary_tags: demo.secondary_tags || [],
+        expected_answer_type: demo.expected_answer_type as any || 'tactical',
+        urgency_level: demo.urgency_level as any || 'medium',
+        ai_summary: demo.ai_summary,
+        visibility_level: demo.visibility_level as any || 'public',
+        is_anonymous: demo.is_anonymous || false,
+        is_sensitive: demo.is_sensitive || false,
+        status: demo.status as any || 'active',
+        view_count: demo.view_count || 0,
+        response_count: demo.response_count || 0,
+        helpful_votes: demo.helpful_votes || 0,
+        created_at: demo.created_at,
+        updated_at: demo.updated_at,
+        expires_at: demo.expires_at,
+        is_demo: true
+      }));
+    }
+
+    // Fallback: try to get from questions table with is_demo = true
+    let fallbackQuery = supabase
+      .from('questions')
+      .select('*')
+      .eq('is_demo', true)
+      .order('created_at', { ascending: false });
+      
+    if (category && category !== 'all') {
+      const categoryTagMap: { [key: string]: string[] } = {
+        'my_questions': ['personal', 'career', 'development'],
+        'matched_questions': ['expertise', 'consulting', 'advice'],
+        'explore_topics': ['learning', 'research', 'exploration']
+      };
+      
+      const tags = categoryTagMap[category];
+      if (tags && tags.length > 0) {
+        fallbackQuery = fallbackQuery.overlaps('primary_tags', tags);
+      }
+    }
+      
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery.limit(20);
+
+    if (fallbackError) {
+      console.error('Error fetching demo questions from questions table:', fallbackError);
       return [];
     }
 
-    return data || [];
+    return fallbackData || [];
   } catch (error) {
     console.error('Error fetching demo questions:', error);
     return [];
@@ -282,9 +334,8 @@ export async function getExploreTopicsQuestions(topics: string[] = []): Promise<
 
     // Get demo questions that match the provided topics
     const { data, error } = await supabase
-      .from('questions')
+      .from('demo_questions')
       .select('*')
-      .eq('is_demo', true)
       .or(topics.map(topic => `primary_tags.cs.{${topic}}`).join(','))
       .order('created_at', { ascending: false })
       .limit(20);
@@ -294,7 +345,29 @@ export async function getExploreTopicsQuestions(topics: string[] = []): Promise<
       return [];
     }
 
-    return data || [];
+    // Convert demo_questions format to Question format
+    return (data || []).map(demo => ({
+      id: demo.id,
+      asker_id: 'demo-user',
+      title: demo.title,
+      content: demo.content,
+      primary_tags: demo.primary_tags || [],
+      secondary_tags: demo.secondary_tags || [],
+      expected_answer_type: demo.expected_answer_type as any || 'tactical',
+      urgency_level: demo.urgency_level as any || 'medium',
+      ai_summary: demo.ai_summary,
+      visibility_level: demo.visibility_level as any || 'public',
+      is_anonymous: demo.is_anonymous || false,
+      is_sensitive: demo.is_sensitive || false,
+      status: demo.status as any || 'active',
+      view_count: demo.view_count || 0,
+      response_count: demo.response_count || 0,
+      helpful_votes: demo.helpful_votes || 0,
+      created_at: demo.created_at,
+      updated_at: demo.updated_at,
+      expires_at: demo.expires_at,
+      is_demo: true
+    }));
   } catch (error) {
     console.error('Error fetching explore topics questions:', error);
     return [];
@@ -456,40 +529,16 @@ I've seen this approach work well in similar situations. The key is to be flexib
 // Seed demo questions if they don't exist
 export async function seedDemoQuestions(): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get current authenticated user
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) {
-      return { success: false, error: 'Not authenticated' };
-    }
-
-    // Check if demo questions already exist
+    // Check if demo questions already exist in demo_questions table
     const { count } = await supabase
-      .from('questions')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_demo', true);
+      .from('demo_questions')
+      .select('*', { count: 'exact', head: true });
 
     if (count && count > 0) {
-      // Check if we need to seed demo responses
-      const { data: firstDemoQuestion } = await supabase
-        .from('questions')
-        .select('id')
-        .eq('is_demo', true)
-        .limit(1)
-        .maybeSingle();
-        
-      if (firstDemoQuestion) {
-        const { count: responseCount } = await supabase
-          .from('question_responses')
-          .select('*', { count: 'exact', head: true })
-          .eq('question_id', firstDemoQuestion.id);
-          
-        if (responseCount && responseCount > 0) {
-          return { success: true }; // Already seeded with responses
-        }
-      }
+      return { success: true }; // Already seeded
     }
 
-    // Sample demo questions to seed
+    // Sample demo questions to seed in demo_questions table
     const demoQuestions = [
       {
         title: "How to scale a SaaS product from 100 to 1000 customers?",
@@ -498,7 +547,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["operations", "strategy", "customer-success"],
         expected_answer_type: "strategic",
         urgency_level: "medium",
-        is_demo: true
+        category: "business"
       },
       {
         title: "Best practices for remote team management in 2024?",
@@ -507,7 +556,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["productivity", "culture", "communication"],
         expected_answer_type: "tactical",
         urgency_level: "medium",
-        is_demo: true
+        category: "management"
       },
       {
         title: "Fundraising strategy for B2B marketplace?",
@@ -516,7 +565,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["venture-capital", "strategy", "growth"],
         expected_answer_type: "strategic",
         urgency_level: "high",
-        is_demo: true
+        category: "finance"
       },
       {
         title: "How to implement effective CI/CD for a growing engineering team?",
@@ -525,7 +574,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["automation", "productivity", "scaling"],
         expected_answer_type: "tactical",
         urgency_level: "medium",
-        is_demo: true
+        category: "technology"
       },
       {
         title: "Strategies for reducing customer acquisition cost (CAC)?",
@@ -534,7 +583,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["metrics", "acquisition", "roi"],
         expected_answer_type: "strategic",
         urgency_level: "high",
-        is_demo: true
+        category: "marketing"
       },
       {
         title: "How to structure equity compensation for early employees?",
@@ -543,7 +592,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["hiring", "retention", "vesting"],
         expected_answer_type: "strategic",
         urgency_level: "medium",
-        is_demo: true
+        category: "hr"
       },
       {
         title: "Best approach for migrating from monolith to microservices?",
@@ -552,7 +601,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["technical-debt", "scaling", "engineering"],
         expected_answer_type: "tactical",
         urgency_level: "medium",
-        is_demo: true
+        category: "technology"
       },
       {
         title: "How to build a data-driven product culture?",
@@ -561,7 +610,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["analytics", "decision-making", "metrics"],
         expected_answer_type: "strategic",
         urgency_level: "medium",
-        is_demo: true
+        category: "product"
       },
       {
         title: "Effective strategies for enterprise sales?",
@@ -570,7 +619,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["negotiation", "stakeholders", "contracts"],
         expected_answer_type: "tactical",
         urgency_level: "high",
-        is_demo: true
+        category: "sales"
       },
       {
         title: "How to implement OKRs effectively in a startup?",
@@ -579,27 +628,25 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         secondary_tags: ["alignment", "metrics", "performance"],
         expected_answer_type: "tactical",
         urgency_level: "medium",
-        is_demo: true
+        category: "management"
       }
     ];
 
-    // Insert or update demo questions in the questions table using the current user's ID
+    // Insert demo questions into demo_questions table (this table has more permissive RLS policies)
     for (const question of demoQuestions) {
-      const { data, error } = await supabase
-        .from('questions')
+      const { error } = await supabase
+        .from('demo_questions')
         .upsert({
           ...question,
-          asker_id: user.user.id, // Use current user's ID instead of random UUID
           visibility_level: 'public',
           is_anonymous: false,
           is_sensitive: false,
           status: 'active',
           view_count: Math.floor(Math.random() * 100) + 10,
-          response_count: 0,
+          response_count: Math.floor(Math.random() * 5) + 1,
           helpful_votes: Math.floor(Math.random() * 20),
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
-        })
-        .select();
+        });
 
       if (error) {
         console.error('Error upserting demo question:', error);
@@ -607,11 +654,10 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
       }
     }
 
-    // Get all demo question IDs
+    // Get all demo question IDs for seeding responses
     const { data: demoQuestionData, error: demoQuestionError } = await supabase
-      .from('questions')
-      .select('id')
-      .eq('is_demo', true);
+      .from('demo_questions')
+      .select('id');
 
     if (demoQuestionError || !demoQuestionData) {
       console.error('Error fetching demo question IDs:', demoQuestionError);
@@ -705,9 +751,9 @@ async function seedDemoResponses(questionId: string): Promise<void> {
       console.error('Error inserting demo responses:', error);
     }
     
-    // Update response count on the question
+    // Update response count on the demo question
     await supabase
-      .from('questions')
+      .from('demo_questions')
       .update({ response_count: responses.length })
       .eq('id', questionId);
       
