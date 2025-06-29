@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, User, Clock, ThumbsUp, Tag, Users, Filter, Search, ArrowRight, ExternalLink } from 'lucide-react';
 import { getNetworkActivityFeed, type NetworkActivity } from '../../services/networkService';
 import { useNavigate } from 'react-router-dom';
+import { getPreferences, UserPreferences } from '../../services/preferenceService';
 
 interface NetworkActivityFeedProps {
   maxDegree?: number;
@@ -19,22 +20,62 @@ const NetworkActivityFeed: React.FC<NetworkActivityFeedProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'questions' | 'answers'>('all');
   const [filterDegree, setFilterDegree] = useState<number | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [effectiveMaxDegree, setEffectiveMaxDegree] = useState(maxDegree);
+
+  useEffect(() => {
+    loadUserPreferences();
+  }, []);
+
+  useEffect(() => {
+    if (preferences?.networkFeed) {
+      // Apply user preferences
+      setFilterType(preferences.networkFeed.filterType || 'all');
+      setFilterDegree(preferences.networkFeed.filterDegree);
+      
+      // Use preference maxDegree if available, otherwise use prop
+      const prefMaxDegree = preferences.networkFeed.maxDegree;
+      setEffectiveMaxDegree(prefMaxDegree || maxDegree);
+    }
+  }, [preferences, maxDegree]);
 
   useEffect(() => {
     loadNetworkActivity();
-  }, [maxDegree, limit]);
+    
+    // Set up auto-refresh if enabled in preferences
+    if (preferences?.networkFeed?.autoRefresh && preferences.networkFeed.refreshInterval) {
+      const interval = setInterval(() => {
+        loadNetworkActivity(false); // Don't show loading state for auto-refresh
+      }, preferences.networkFeed.refreshInterval * 60 * 1000); // Convert minutes to milliseconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [effectiveMaxDegree, limit, preferences?.networkFeed?.autoRefresh, preferences?.networkFeed?.refreshInterval]);
 
-  const loadNetworkActivity = async () => {
-    setLoading(true);
+  const loadUserPreferences = async () => {
+    try {
+      const userPreferences = await getPreferences();
+      setPreferences(userPreferences);
+    } catch (error) {
+      console.error('Error loading user preferences:', error);
+    }
+  };
+
+  const loadNetworkActivity = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      const data = await getNetworkActivityFeed(maxDegree, limit);
+      const data = await getNetworkActivityFeed(effectiveMaxDegree, limit);
       setActivities(data);
     } catch (error) {
       console.error('Error loading network activity:', error);
       setError('Failed to load network activity. Please try again.');
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -100,7 +141,47 @@ const NetworkActivityFeed: React.FC<NetworkActivityFeedProps> = ({
       filterDegree === null || 
       activity.network_degree === filterDegree;
     
-    return matchesSearch && matchesType && matchesDegree;
+    // Filter by tags from preferences
+    const matchesTags = 
+      !preferences?.networkFeed?.showTags?.length || 
+      activity.tags.some(tag => 
+        preferences.networkFeed?.showTags?.some(showTag => 
+          tag.toLowerCase().includes(showTag.toLowerCase()) || 
+          showTag.toLowerCase().includes(tag.toLowerCase())
+        )
+      );
+    
+    // Filter out hidden tags from preferences
+    const notHiddenTags = 
+      !preferences?.networkFeed?.hideTags?.length || 
+      !activity.tags.some(tag => 
+        preferences.networkFeed?.hideTags?.some(hideTag => 
+          tag.toLowerCase().includes(hideTag.toLowerCase()) || 
+          hideTag.toLowerCase().includes(tag.toLowerCase())
+        )
+      );
+    
+    return matchesSearch && matchesType && matchesDegree && matchesTags && notHiddenTags;
+  });
+
+  // Sort activities based on preferences
+  const sortedActivities = [...filteredActivities].sort((a, b) => {
+    const sortOrder = preferences?.networkFeed?.sortOrder || 'newest';
+    
+    if (sortOrder === 'newest') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    } else if (sortOrder === 'popular') {
+      // Sort by a combination of responses and helpful votes
+      const aPopularity = a.response_count * 2 + a.helpful_votes;
+      const bPopularity = b.response_count * 2 + b.helpful_votes;
+      return bPopularity - aPopularity;
+    } else if (sortOrder === 'relevant') {
+      // Sort by network degree (closer connections first)
+      return a.network_degree - b.network_degree;
+    }
+    
+    // Default to newest
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
   if (loading) {
@@ -141,7 +222,7 @@ const NetworkActivityFeed: React.FC<NetworkActivityFeedProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             <Users className="h-5 w-5 text-purple-600" />
-            <span className="font-bold text-gray-900">Up to {getNetworkDegreeLabel(maxDegree)}</span>
+            <span className="font-bold text-gray-900">Up to {getNetworkDegreeLabel(effectiveMaxDegree)}</span>
           </div>
         </div>
 
@@ -181,12 +262,21 @@ const NetworkActivityFeed: React.FC<NetworkActivityFeedProps> = ({
               <option value="all">All Connections</option>
               <option value="1">1st Degree Only</option>
               <option value="2">2nd Degree Only</option>
+              {effectiveMaxDegree >= 3 && <option value="3">3rd Degree Only</option>}
             </select>
           </div>
+          
+          <button
+            onClick={() => navigate('/preferences')}
+            className="flex items-center space-x-1 text-purple-600 hover:text-purple-700 transition-colors duration-300"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="text-sm">More Settings</span>
+          </button>
         </div>
 
         {/* Activity List */}
-        {filteredActivities.length === 0 ? (
+        {sortedActivities.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
             <p>No network activity found</p>
@@ -194,7 +284,7 @@ const NetworkActivityFeed: React.FC<NetworkActivityFeedProps> = ({
           </div>
         ) : (
           <div className="space-y-6">
-            {filteredActivities.map((activity) => (
+            {sortedActivities.map((activity) => (
               <div
                 key={`${activity.activity_type}-${activity.activity_id}`}
                 className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow duration-300 cursor-pointer"
@@ -300,16 +390,16 @@ const NetworkActivityFeed: React.FC<NetworkActivityFeedProps> = ({
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Network Insights</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg p-4 border border-purple-200">
-            <div className="text-lg font-semibold text-purple-600 mb-1">{filteredActivities.filter(a => a.activity_type === 'question').length}</div>
+            <div className="text-lg font-semibold text-purple-600 mb-1">{sortedActivities.filter(a => a.activity_type === 'question').length}</div>
             <div className="text-sm text-gray-600">Questions in your network</div>
           </div>
           <div className="bg-white rounded-lg p-4 border border-purple-200">
-            <div className="text-lg font-semibold text-indigo-600 mb-1">{filteredActivities.filter(a => a.activity_type === 'response').length}</div>
+            <div className="text-lg font-semibold text-indigo-600 mb-1">{sortedActivities.filter(a => a.activity_type === 'response').length}</div>
             <div className="text-sm text-gray-600">Answers from your network</div>
           </div>
           <div className="bg-white rounded-lg p-4 border border-purple-200">
             <div className="text-lg font-semibold text-blue-600 mb-1">
-              {new Set(filteredActivities.map(a => a.user_id)).size}
+              {new Set(sortedActivities.map(a => a.user_id)).size}
             </div>
             <div className="text-sm text-gray-600">Active network members</div>
           </div>
@@ -317,8 +407,13 @@ const NetworkActivityFeed: React.FC<NetworkActivityFeedProps> = ({
         
         <div className="mt-4 text-sm text-purple-700">
           <p>
-            Your network activity feed shows questions and answers from your connections up to {getNetworkDegreeLabel(maxDegree)}.
-            Expand your network to see more relevant content.
+            Your network activity feed shows questions and answers from your connections up to {getNetworkDegreeLabel(effectiveMaxDegree)}.
+            <button 
+              onClick={() => navigate('/preferences')}
+              className="ml-2 text-purple-600 hover:text-purple-800 underline"
+            >
+              Customize your feed settings
+            </button>
           </p>
         </div>
       </div>

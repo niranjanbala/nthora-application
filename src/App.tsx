@@ -8,6 +8,7 @@ import QuestionDetail from './components/questions/QuestionDetail';
 import InviteRegistration from './components/membership/InviteRegistration';
 import Onboarding from './pages/Onboarding';
 import OnboardingDemo from './pages/OnboardingDemo';
+import PreferencesPage from './pages/PreferencesPage';
 
 function App() {
   return (
@@ -62,6 +63,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <OnboardingDemo />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/preferences" 
+            element={
+              <ProtectedRoute>
+                <PreferencesPage />
               </ProtectedRoute>
             } 
           />

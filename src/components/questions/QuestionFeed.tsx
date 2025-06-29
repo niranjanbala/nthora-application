@@ -1,42 +1,88 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, MessageSquare, Tag, AlertTriangle, Lock, Plus, ArrowRight } from 'lucide-react';
+import { Clock, Users, MessageSquare, Tag, AlertTriangle, Lock, Plus, ArrowRight, ToggleLeft, ToggleRight } from 'lucide-react';
 import { 
   getUserQuestions, 
   getMatchedQuestions, 
   getAllQuestions,
+  getExploreTopicsQuestions,
+  getDemoQuestions,
+  seedDemoQuestions,
   type Question 
 } from '../../services/questionRoutingService';
 
 interface QuestionFeedProps {
-  view: 'my_questions' | 'matched_questions' | 'all';
+  view: 'my_questions' | 'matched_questions' | 'all' | 'explore_topics';
+  isDemoMode?: boolean;
 }
 
-const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
+const QuestionFeed: React.FC<QuestionFeedProps> = ({ 
+  view,
+  isDemoMode = false
+}) => {
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [localDemoMode, setLocalDemoMode] = useState(isDemoMode);
+  const [seedingDemo, setSeedingDemo] = useState(false);
+
+  useEffect(() => {
+    setLocalDemoMode(isDemoMode);
+  }, [isDemoMode]);
 
   useEffect(() => {
     loadQuestions();
-  }, [view]);
+  }, [view, localDemoMode]);
 
   const loadQuestions = async () => {
     setLoading(true);
     try {
-      let data: Question[] = [];
-      
-      if (view === 'matched_questions') {
-        const matchedQuestions = await getMatchedQuestions();
-        data = matchedQuestions;
-      } else if (view === 'my_questions') {
-        data = await getUserQuestions();
+      if (localDemoMode) {
+        // Load demo questions from database
+        let demoQuestions: Question[] = [];
+        
+        // Check if we need to seed demo questions first
+        if (!seedingDemo) {
+          setSeedingDemo(true);
+          await seedDemoQuestions();
+          setSeedingDemo(false);
+        }
+        
+        // Get demo questions for the specific view
+        if (view === 'all') {
+          demoQuestions = await getDemoQuestions('all');
+        } else if (view === 'my_questions') {
+          demoQuestions = await getDemoQuestions('my_questions');
+        } else if (view === 'matched_questions') {
+          demoQuestions = await getDemoQuestions('matched_questions');
+        } else if (view === 'explore_topics') {
+          demoQuestions = await getDemoQuestions('explore_topics');
+        }
+        
+        // If no specific category questions found, fall back to all demo questions
+        if (demoQuestions.length === 0) {
+          demoQuestions = await getDemoQuestions();
+        }
+        
+        setQuestions(demoQuestions);
       } else {
-        data = await getAllQuestions();
+        // Load real questions
+        let data: Question[] = [];
+        
+        if (view === 'matched_questions') {
+          const matchedQuestions = await getMatchedQuestions();
+          data = matchedQuestions;
+        } else if (view === 'my_questions') {
+          data = await getUserQuestions();
+        } else if (view === 'explore_topics') {
+          data = await getExploreTopicsQuestions();
+        } else {
+          data = await getAllQuestions();
+        }
+        
+        setQuestions(data);
       }
-      
-      setQuestions(data);
     } catch (error) {
       console.error('Error loading questions:', error);
     } finally {
@@ -92,6 +138,7 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
     switch (view) {
       case 'my_questions': return 'My Questions';
       case 'matched_questions': return 'Questions for You';
+      case 'explore_topics': return 'Explore Topics';
       case 'all': return 'All Questions';
       default: return 'Questions';
     }
@@ -101,6 +148,7 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
     switch (view) {
       case 'my_questions': return 'Questions you\'ve asked';
       case 'matched_questions': return 'Questions matched to your expertise';
+      case 'explore_topics': return 'Questions in your areas of interest and expertise';
       case 'all': return 'Recent questions from the community';
       default: return 'Browse questions';
     }
@@ -121,6 +169,13 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
           description: 'Questions that match your expertise will appear here',
           action: null,
           actionHandler: null
+        };
+      case 'explore_topics':
+        return {
+          title: 'No relevant questions found',
+          description: 'Add more expertise areas or help topics in your profile to see relevant questions',
+          action: 'Update Profile',
+          actionHandler: () => navigate('/dashboard?view=profile')
         };
       case 'all':
         return {
@@ -201,10 +256,51 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
           <h2 className="text-2xl font-medium text-ink-dark">{getViewTitle()}</h2>
           <p className="text-ink-light">{getViewDescription()}</p>
         </div>
-        <div className="text-sm text-ink-light">
-          {questions.length} question{questions.length !== 1 ? 's' : ''}
+        <div className="flex items-center space-x-4">
+          <div className="text-sm text-ink-light">
+            {questions.length} question{questions.length !== 1 ? 's' : ''}
+          </div>
+          
+          {/* Demo Mode Toggle */}
+          <button
+            onClick={() => setLocalDemoMode(!localDemoMode)}
+            className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors duration-300 ${
+              localDemoMode 
+                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {localDemoMode ? (
+              <>
+                <ToggleRight className="h-4 w-4" />
+                <span className="text-sm font-medium">Demo Mode</span>
+              </>
+            ) : (
+              <>
+                <ToggleLeft className="h-4 w-4" />
+                <span className="text-sm font-medium">Demo Mode</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Demo Mode Banner */}
+      {localDemoMode && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+              <ToggleRight className="h-4 w-4 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="font-medium text-purple-900">Demo Mode Active</h3>
+              <p className="text-sm text-purple-700">
+                You're viewing simulated questions. Toggle demo mode off to see real content.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Questions List */}
       <motion.div 

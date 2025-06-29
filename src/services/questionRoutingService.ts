@@ -21,6 +21,7 @@ export interface Question {
   created_at: string;
   updated_at: string;
   expires_at: string;
+  is_demo?: boolean;
 }
 
 export interface QuestionMatch {
@@ -143,7 +144,8 @@ export async function createQuestion(
         ai_summary: analysis.summary,
         visibility_level: options.visibility_level || 'first_degree',
         is_anonymous: options.is_anonymous || false,
-        is_sensitive: options.is_sensitive || false
+        is_sensitive: options.is_sensitive || false,
+        is_demo: false
       })
       .select()
       .single();
@@ -161,24 +163,23 @@ export async function createQuestion(
 // Get question by ID
 export async function getQuestionById(questionId: string): Promise<Question | null> {
   try {
-    const { data, error } = await supabase
+    const { data: questionData, error: questionError } = await supabase
       .from('questions')
       .select('*')
       .eq('id', questionId)
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      console.error('Error fetching question:', error);
-      return null;
+    if (questionData) {
+      // Increment view count
+      await supabase
+        .from('questions')
+        .update({ view_count: (questionData.view_count || 0) + 1 })
+        .eq('id', questionId);
+
+      return questionData;
     }
 
-    // Increment view count
-    await supabase
-      .from('questions')
-      .update({ view_count: (data.view_count || 0) + 1 })
-      .eq('id', questionId);
-
-    return data;
+    return null;
   } catch (error) {
     console.error('Error fetching question:', error);
     return null;
@@ -195,6 +196,7 @@ export async function getUserQuestions(): Promise<Question[]> {
       .from('questions')
       .select('*')
       .eq('asker_id', user.user.id)
+      .eq('is_demo', false)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -216,6 +218,7 @@ export async function getAllQuestions(): Promise<Question[]> {
       .from('questions')
       .select('*')
       .eq('status', 'active')
+      .eq('is_demo', false)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -228,6 +231,534 @@ export async function getAllQuestions(): Promise<Question[]> {
   } catch (error) {
     console.error('Error fetching questions:', error);
     return [];
+  }
+}
+
+// Get demo questions
+export async function getDemoQuestions(category?: string): Promise<Question[]> {
+  try {
+    // First try to get from demo_questions table
+    let query = supabase
+      .from('demo_questions')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    // Filter by category if provided
+    if (category && category !== 'all') {
+      const categoryTagMap: { [key: string]: string[] } = {
+        'my_questions': ['personal', 'career', 'development'],
+        'matched_questions': ['expertise', 'consulting', 'advice'],
+        'explore_topics': ['learning', 'research', 'exploration']
+      };
+      
+      const tags = categoryTagMap[category];
+      if (tags && tags.length > 0) {
+        query = query.overlaps('primary_tags', tags);
+      }
+    }
+      
+    const { data: demoData, error: demoError } = await query.limit(20);
+
+    if (demoError) {
+      console.error('Error fetching demo questions from demo_questions table:', demoError);
+    }
+
+    // If we have demo questions from the demo_questions table, return them
+    if (demoData && demoData.length > 0) {
+      // Convert demo_questions format to Question format
+      return demoData.map(demo => ({
+        id: demo.id,
+        asker_id: 'demo-user',
+        title: demo.title,
+        content: demo.content,
+        primary_tags: demo.primary_tags || [],
+        secondary_tags: demo.secondary_tags || [],
+        expected_answer_type: demo.expected_answer_type as any || 'tactical',
+        urgency_level: demo.urgency_level as any || 'medium',
+        ai_summary: demo.ai_summary,
+        visibility_level: demo.visibility_level as any || 'public',
+        is_anonymous: demo.is_anonymous || false,
+        is_sensitive: demo.is_sensitive || false,
+        status: demo.status as any || 'active',
+        view_count: demo.view_count || 0,
+        response_count: demo.response_count || 0,
+        helpful_votes: demo.helpful_votes || 0,
+        created_at: demo.created_at,
+        updated_at: demo.updated_at,
+        expires_at: demo.expires_at,
+        is_demo: true
+      }));
+    }
+
+    // Fallback: try to get from questions table with is_demo = true
+    let fallbackQuery = supabase
+      .from('questions')
+      .select('*')
+      .eq('is_demo', true)
+      .order('created_at', { ascending: false });
+      
+    if (category && category !== 'all') {
+      const categoryTagMap: { [key: string]: string[] } = {
+        'my_questions': ['personal', 'career', 'development'],
+        'matched_questions': ['expertise', 'consulting', 'advice'],
+        'explore_topics': ['learning', 'research', 'exploration']
+      };
+      
+      const tags = categoryTagMap[category];
+      if (tags && tags.length > 0) {
+        fallbackQuery = fallbackQuery.overlaps('primary_tags', tags);
+      }
+    }
+      
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery.limit(20);
+
+    if (fallbackError) {
+      console.error('Error fetching demo questions from questions table:', fallbackError);
+      return [];
+    }
+
+    return fallbackData || [];
+  } catch (error) {
+    console.error('Error fetching demo questions:', error);
+    return [];
+  }
+}
+
+// Get questions for explore topics based on user interests
+export async function getExploreTopicsQuestions(topics: string[] = []): Promise<Question[]> {
+  try {
+    // If no topics provided, get all demo questions
+    if (topics.length === 0) {
+      return await getDemoQuestions();
+    }
+
+    // Get demo questions that match the provided topics
+    const { data, error } = await supabase
+      .from('demo_questions')
+      .select('*')
+      .or(topics.map(topic => `primary_tags.cs.{${topic}}`).join(','))
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Error fetching explore topics questions:', error);
+      return [];
+    }
+
+    // Convert demo_questions format to Question format
+    return (data || []).map(demo => ({
+      id: demo.id,
+      asker_id: 'demo-user',
+      title: demo.title,
+      content: demo.content,
+      primary_tags: demo.primary_tags || [],
+      secondary_tags: demo.secondary_tags || [],
+      expected_answer_type: demo.expected_answer_type as any || 'tactical',
+      urgency_level: demo.urgency_level as any || 'medium',
+      ai_summary: demo.ai_summary,
+      visibility_level: demo.visibility_level as any || 'public',
+      is_anonymous: demo.is_anonymous || false,
+      is_sensitive: demo.is_sensitive || false,
+      status: demo.status as any || 'active',
+      view_count: demo.view_count || 0,
+      response_count: demo.response_count || 0,
+      helpful_votes: demo.helpful_votes || 0,
+      created_at: demo.created_at,
+      updated_at: demo.updated_at,
+      expires_at: demo.expires_at,
+      is_demo: true
+    }));
+  } catch (error) {
+    console.error('Error fetching explore topics questions:', error);
+    return [];
+  }
+}
+
+// Get count of real questions (non-demo)
+export async function getRealQuestionCount(): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('questions')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_demo', false);
+
+    if (error) {
+      console.error('Error fetching real question count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error('Error fetching real question count:', error);
+    return 0;
+  }
+}
+
+// Demo response templates for different quality levels
+const DEMO_RESPONSES = {
+  HIGH_QUALITY: [
+    {
+      content: `# Comprehensive Analysis
+
+## Key Considerations
+1. **Strategic Alignment**: Ensure your approach aligns with your overall business strategy
+2. **Resource Allocation**: Carefully balance resources between immediate needs and long-term goals
+3. **Stakeholder Management**: Identify and engage all relevant stakeholders early
+
+## Recommended Approach
+- Start with a thorough assessment of your current state
+- Develop a phased implementation plan with clear milestones
+- Establish robust feedback mechanisms to enable continuous improvement
+
+## Common Pitfalls to Avoid
+- Underestimating the complexity of change management
+- Failing to secure executive sponsorship
+- Neglecting to communicate the "why" behind changes
+
+I've implemented similar initiatives at three Fortune 500 companies and would be happy to discuss specific aspects in more detail.`,
+      response_type: 'strategic',
+      helpful_votes: 15,
+      unhelpful_votes: 0,
+      quality_score: 0.95,
+      source_type: 'human',
+      network_degree: 1
+    },
+    {
+      content: `# Detailed Implementation Guide
+
+## Step 1: Assessment (Week 1-2)
+- Conduct stakeholder interviews to understand current pain points
+- Analyze existing processes and identify bottlenecks
+- Benchmark against industry standards to establish realistic targets
+
+## Step 2: Planning (Week 3-4)
+- Define clear success metrics aligned with business objectives
+- Create a detailed implementation roadmap with dependencies mapped
+- Develop a comprehensive risk management plan
+
+## Step 3: Execution (Week 5-12)
+- Begin with a pilot in a controlled environment
+- Implement changes in phases to minimize disruption
+- Collect continuous feedback and make iterative improvements
+
+## Step 4: Evaluation (Week 13-16)
+- Measure outcomes against predefined success metrics
+- Document lessons learned for future initiatives
+- Develop a sustainability plan for long-term success
+
+Based on my experience implementing this at companies ranging from startups to enterprises, the key success factor is maintaining clear communication throughout the process. I'm happy to provide more specific guidance on any particular aspect.`,
+      response_type: 'tactical',
+      helpful_votes: 12,
+      unhelpful_votes: 1,
+      quality_score: 0.92,
+      source_type: 'human',
+      network_degree: 1
+    }
+  ],
+  MEDIUM_QUALITY: [
+    {
+      content: `Here are some suggestions based on my experience:
+
+1. Start by identifying your key challenges
+2. Look for quick wins that can demonstrate value
+3. Build a roadmap for longer-term improvements
+4. Get buy-in from stakeholders
+
+You should also consider:
+- Available resources
+- Timeline constraints
+- Potential risks
+
+I implemented something similar last year and found that starting small and building momentum worked well. Let me know if you have specific questions about any part of this approach.`,
+      response_type: 'strategic',
+      helpful_votes: 7,
+      unhelpful_votes: 2,
+      quality_score: 0.65,
+      source_type: 'agentic_human',
+      quality_level: 'medium',
+      network_degree: 2
+    },
+    {
+      content: `Based on my experience, here's what I recommend:
+
+1. Analyze your current situation
+2. Set clear goals for what you want to achieve
+3. Develop an action plan with specific steps
+4. Implement changes gradually
+5. Measure results and adjust as needed
+
+Some tools that might help:
+- Project management software like Asana or Trello
+- Regular team check-ins
+- Feedback surveys
+
+I've seen this approach work well in similar situations. The key is to be flexible and willing to adapt as you learn more.`,
+      response_type: 'tactical',
+      helpful_votes: 5,
+      unhelpful_votes: 3,
+      quality_score: 0.6,
+      source_type: 'agentic_human',
+      quality_level: 'medium',
+      network_degree: 2
+    }
+  ],
+  LOW_QUALITY: [
+    {
+      content: `You should probably just try harder. Maybe read some books or articles about it. There are probably some good resources online. Good luck!`,
+      response_type: 'resource',
+      helpful_votes: 1,
+      unhelpful_votes: 8,
+      quality_score: 0.2,
+      source_type: 'agentic_human',
+      quality_level: 'low',
+      network_degree: 3
+    },
+    {
+      content: `I think you need to make a plan and then follow it. Also talk to people who know about this stuff. Maybe hire a consultant if you have budget.`,
+      response_type: 'strategic',
+      helpful_votes: 2,
+      unhelpful_votes: 6,
+      quality_score: 0.3,
+      source_type: 'agentic_human',
+      quality_level: 'low',
+      network_degree: 3
+    }
+  ]
+};
+
+// Seed demo questions if they don't exist
+export async function seedDemoQuestions(): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if demo questions already exist in demo_questions table
+    const { count } = await supabase
+      .from('demo_questions')
+      .select('*', { count: 'exact', head: true });
+
+    if (count && count > 0) {
+      return { success: true }; // Already seeded
+    }
+
+    // Sample demo questions to seed in demo_questions table
+    const demoQuestions = [
+      {
+        title: "How to scale a SaaS product from 100 to 1000 customers?",
+        content: "We've successfully grown our SaaS platform to 100 paying customers, but we're hitting some scaling challenges. What are the key operational, technical, and strategic considerations for growing to 1000 customers?",
+        primary_tags: ["saas", "scaling", "growth"],
+        secondary_tags: ["operations", "strategy", "customer-success"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        category: "business"
+      },
+      {
+        title: "Best practices for remote team management in 2024?",
+        content: "Leading a distributed team of 15 people across different time zones. Looking for proven strategies to maintain productivity, culture, and team cohesion.",
+        primary_tags: ["remote-work", "management", "leadership"],
+        secondary_tags: ["productivity", "culture", "communication"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "management"
+      },
+      {
+        title: "Fundraising strategy for B2B marketplace?",
+        content: "Building a B2B marketplace connecting manufacturers with suppliers. We have early traction but need to raise Series A. What should our fundraising strategy look like?",
+        primary_tags: ["fundraising", "b2b", "marketplace"],
+        secondary_tags: ["venture-capital", "strategy", "growth"],
+        expected_answer_type: "strategic",
+        urgency_level: "high",
+        category: "finance"
+      },
+      {
+        title: "How to implement effective CI/CD for a growing engineering team?",
+        content: "Our team has grown from 3 to 15 engineers in the last year, and our deployment process is becoming a bottleneck. Looking for advice on implementing CI/CD that can scale with our team.",
+        primary_tags: ["engineering", "ci-cd", "devops"],
+        secondary_tags: ["automation", "productivity", "scaling"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "technology"
+      },
+      {
+        title: "Strategies for reducing customer acquisition cost (CAC)?",
+        content: "Our CAC has been steadily increasing over the past 6 months. What strategies have worked for others to bring this down while maintaining growth?",
+        primary_tags: ["marketing", "cac", "growth"],
+        secondary_tags: ["metrics", "acquisition", "roi"],
+        expected_answer_type: "strategic",
+        urgency_level: "high",
+        category: "marketing"
+      },
+      {
+        title: "How to structure equity compensation for early employees?",
+        content: "We're a pre-seed startup about to make our first 5 hires. How should we think about equity allocation, vesting schedules, and communicating the value to candidates?",
+        primary_tags: ["equity", "compensation", "startup"],
+        secondary_tags: ["hiring", "retention", "vesting"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        category: "hr"
+      },
+      {
+        title: "Best approach for migrating from monolith to microservices?",
+        content: "We have a 5-year-old monolithic application that's becoming difficult to maintain and scale. What's the best approach to gradually migrate to a microservices architecture while keeping the business running?",
+        primary_tags: ["microservices", "architecture", "migration"],
+        secondary_tags: ["technical-debt", "scaling", "engineering"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "technology"
+      },
+      {
+        title: "How to build a data-driven product culture?",
+        content: "Our product decisions are often based on intuition rather than data. How can we build a more data-driven product culture without slowing down our pace of innovation?",
+        primary_tags: ["product", "data", "culture"],
+        secondary_tags: ["analytics", "decision-making", "metrics"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        category: "product"
+      },
+      {
+        title: "Effective strategies for enterprise sales?",
+        content: "We're transitioning from SMB to enterprise customers. What are effective strategies for navigating longer sales cycles, multiple stakeholders, and enterprise requirements?",
+        primary_tags: ["sales", "enterprise", "b2b"],
+        secondary_tags: ["negotiation", "stakeholders", "contracts"],
+        expected_answer_type: "tactical",
+        urgency_level: "high",
+        category: "sales"
+      },
+      {
+        title: "How to implement OKRs effectively in a startup?",
+        content: "We're a 30-person startup and want to implement OKRs to better align our team. What are best practices for introducing OKRs without adding too much process overhead?",
+        primary_tags: ["okrs", "management", "goals"],
+        secondary_tags: ["alignment", "metrics", "performance"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "management"
+      }
+    ];
+
+    // Insert demo questions into demo_questions table (this table has more permissive RLS policies)
+    for (const question of demoQuestions) {
+      const { error } = await supabase
+        .from('demo_questions')
+        .upsert({
+          ...question,
+          visibility_level: 'public',
+          is_anonymous: false,
+          is_sensitive: false,
+          status: 'active',
+          view_count: Math.floor(Math.random() * 100) + 10,
+          response_count: Math.floor(Math.random() * 5) + 1,
+          helpful_votes: Math.floor(Math.random() * 20),
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+        });
+
+      if (error) {
+        console.error('Error upserting demo question:', error);
+        return { success: false, error: error.message };
+      }
+    }
+
+    // Get all demo question IDs for seeding responses
+    const { data: demoQuestionData, error: demoQuestionError } = await supabase
+      .from('demo_questions')
+      .select('id');
+
+    if (demoQuestionError || !demoQuestionData) {
+      console.error('Error fetching demo question IDs:', demoQuestionError);
+      return { success: false, error: demoQuestionError?.message || 'Failed to fetch demo question IDs' };
+    }
+
+    // Seed responses for each demo question
+    for (const question of demoQuestionData) {
+      await seedDemoResponses(question.id);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error seeding demo questions:', error);
+    return { success: false, error: 'Failed to seed demo questions' };
+  }
+}
+
+// Seed demo responses for a question
+async function seedDemoResponses(questionId: string): Promise<void> {
+  try {
+    // Check if responses already exist for this question
+    const { count } = await supabase
+      .from('question_responses')
+      .select('*', { count: 'exact', head: true })
+      .eq('question_id', questionId);
+      
+    if (count && count > 0) {
+      return; // Responses already exist
+    }
+    
+    // Get current user to use as responder (this avoids RLS issues)
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
+      console.log('No authenticated user, skipping demo response seeding');
+      return;
+    }
+    
+    // Create a mix of responses for this question using the current user as responder
+    const responses = [
+      // High quality human response
+      {
+        question_id: questionId,
+        responder_id: user.user.id,
+        content: DEMO_RESPONSES.HIGH_QUALITY[0].content,
+        response_type: DEMO_RESPONSES.HIGH_QUALITY[0].response_type,
+        helpful_votes: DEMO_RESPONSES.HIGH_QUALITY[0].helpful_votes,
+        unhelpful_votes: DEMO_RESPONSES.HIGH_QUALITY[0].unhelpful_votes,
+        quality_score: DEMO_RESPONSES.HIGH_QUALITY[0].quality_score,
+        source_type: DEMO_RESPONSES.HIGH_QUALITY[0].source_type,
+        created_at: new Date(Date.now() - 3600000 * 24).toISOString(), // 1 day ago
+        updated_at: new Date(Date.now() - 3600000 * 24).toISOString()
+      },
+      
+      // Another high quality human response
+      {
+        question_id: questionId,
+        responder_id: user.user.id,
+        content: DEMO_RESPONSES.HIGH_QUALITY[1].content,
+        response_type: DEMO_RESPONSES.HIGH_QUALITY[1].response_type,
+        helpful_votes: DEMO_RESPONSES.HIGH_QUALITY[1].helpful_votes,
+        unhelpful_votes: DEMO_RESPONSES.HIGH_QUALITY[1].unhelpful_votes,
+        quality_score: DEMO_RESPONSES.HIGH_QUALITY[1].quality_score,
+        source_type: DEMO_RESPONSES.HIGH_QUALITY[1].source_type,
+        created_at: new Date(Date.now() - 3600000 * 12).toISOString(), // 12 hours ago
+        updated_at: new Date(Date.now() - 3600000 * 12).toISOString()
+      },
+      
+      // Medium quality AI response
+      {
+        question_id: questionId,
+        responder_id: user.user.id,
+        content: DEMO_RESPONSES.MEDIUM_QUALITY[0].content,
+        response_type: DEMO_RESPONSES.MEDIUM_QUALITY[0].response_type,
+        helpful_votes: DEMO_RESPONSES.MEDIUM_QUALITY[0].helpful_votes,
+        unhelpful_votes: DEMO_RESPONSES.MEDIUM_QUALITY[0].unhelpful_votes,
+        quality_score: DEMO_RESPONSES.MEDIUM_QUALITY[0].quality_score,
+        source_type: DEMO_RESPONSES.MEDIUM_QUALITY[0].source_type,
+        quality_level: DEMO_RESPONSES.MEDIUM_QUALITY[0].quality_level,
+        created_at: new Date(Date.now() - 3600000 * 6).toISOString(), // 6 hours ago
+        updated_at: new Date(Date.now() - 3600000 * 6).toISOString()
+      }
+    ];
+    
+    // Insert all responses
+    const { error } = await supabase
+      .from('question_responses')
+      .insert(responses);
+      
+    if (error) {
+      console.error('Error inserting demo responses:', error);
+    }
+    
+    // Update response count on the demo question
+    await supabase
+      .from('demo_questions')
+      .update({ response_count: responses.length })
+      .eq('id', questionId);
+      
+  } catch (error) {
+    console.error('Error seeding demo responses:', error);
   }
 }
 
@@ -276,6 +807,7 @@ export async function getMatchedQuestions(): Promise<(Question & { match_info: Q
       .select('*')
       .neq('asker_id', user.user.id) // Don't match user's own questions
       .eq('status', 'active')
+      .eq('is_demo', false)
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -351,7 +883,7 @@ export async function respondToQuestion(
       return { success: false, error: error.message };
     }
 
-    // Update question response count
+    // Update response count for the question (works for both demo and regular questions)
     await supabase
       .from('questions')
       .update({ 
@@ -432,21 +964,45 @@ Response type: ${question.expected_answer_type}
 
 // Get responses for a question
 export async function getQuestionResponses(questionId: string): Promise<QuestionResponse[]> {
-  const { data, error } = await supabase
-    .from('question_responses')
-    .select(`
-      *,
-      responder:user_profiles!responder_id(full_name, avatar_url, expertise_areas)
-    `)
-    .eq('question_id', questionId)
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('question_responses')
+      .select(`
+        *,
+        responder:user_profiles!responder_id(id)
+      `)
+      .eq('question_id', questionId)
+      .order('created_at', { ascending: false });
 
-  if (error) {
+    if (error) {
+      console.error('Error fetching question responses:', error);
+      return [];
+    }
+
+    // For each response, get the responder's profile separately
+    const responsesWithProfiles = await Promise.all(
+      (data || []).map(async (response) => {
+        if (response.responder && response.responder.id) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('full_name, avatar_url, expertise_areas')
+            .eq('id', response.responder.id)
+            .maybeSingle();
+            
+          return {
+            ...response,
+            responder: profile || { full_name: 'Anonymous', avatar_url: null, expertise_areas: [] }
+          };
+        }
+        return response;
+      })
+    );
+
+    return responsesWithProfiles || [];
+  } catch (error) {
     console.error('Error fetching question responses:', error);
     return [];
   }
-
-  return data || [];
 }
 
 // Update user expertise

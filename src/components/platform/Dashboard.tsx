@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User, LogOut } from 'lucide-react';
+import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User, LogOut, Compass, ToggleLeft, ToggleRight } from 'lucide-react';
 import QuestionComposer from '../questions/QuestionComposer';
 import QuestionFeed from '../questions/QuestionFeed';
 import ExpertiseManager from '../questions/ExpertiseManager';
@@ -17,7 +17,10 @@ import UserNetworkBadges from '../profile/UserNetworkBadges';
 import NetworkDepthBadges from '../badges/NetworkDepthBadges';
 import NetworkActivityFeed from '../network/NetworkActivityFeed';
 import AutoDetectedSkills from '../network/AutoDetectedSkills';
+import PreferencesPage from '../../pages/PreferencesPage';
 import { signOut } from '../../services/authService';
+import { getRealQuestionCount } from '../../services/questionRoutingService';
+import { getPreferences, updatePreferences } from '../../services/preferenceService';
 
 type DashboardView = 
   | 'feed' 
@@ -34,14 +37,58 @@ type DashboardView =
   | 'network_badges'
   | 'network_depth'
   | 'network_activity'
-  | 'auto_skills';
+  | 'auto_skills'
+  | 'preferences'
+  | 'explore_topics';
 
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentView, setCurrentView] = useState<DashboardView>('feed');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
+  const [isDemoMode, setIsDemoMode] = useState(true); // Default to true
+  const [realQuestionCount, setRealQuestionCount] = useState(0);
+  const [showDemoToggle, setShowDemoToggle] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Load real question count and user preferences on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        // Get count of real questions
+        const count = await getRealQuestionCount();
+        setRealQuestionCount(count);
+        
+        // Get user preferences
+        const preferences = await getPreferences();
+        
+        // Determine initial demo mode state
+        let initialDemoMode = true;
+        
+        if (count === 0) {
+          // If no real questions, force demo mode on
+          initialDemoMode = true;
+        } else if (count >= 10) {
+          // If 10+ real questions, hide demo mode
+          initialDemoMode = false;
+          setShowDemoToggle(false);
+        } else {
+          // Between 1-9 questions, use user preference with fallback to true
+          initialDemoMode = preferences.demoMode !== undefined ? preferences.demoMode : true;
+        }
+        
+        setIsDemoMode(initialDemoMode);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadInitialData();
+  }, []);
 
   // Handle URL-based view changes
   useEffect(() => {
@@ -64,8 +111,23 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const toggleDemoMode = async () => {
+    const newDemoMode = !isDemoMode;
+    setIsDemoMode(newDemoMode);
+    
+    // Save preference if we have real questions
+    if (realQuestionCount > 0) {
+      try {
+        await updatePreferences({ demoMode: newDemoMode });
+      } catch (error) {
+        console.error('Error saving demo mode preference:', error);
+      }
+    }
+  };
+
   const navigationItems = [
     { id: 'feed', label: 'Feed', icon: MessageSquare, badge: null, description: 'Latest questions and activity' },
+    { id: 'explore_topics', label: 'Explore Topics', icon: Compass, badge: null, description: 'Questions in your areas of interest' },
     { id: 'ask_question', label: 'Ask Question', icon: Plus, badge: null, description: 'Get expert answers instantly' },
     { id: 'my_questions', label: 'My Questions', icon: MessageSquare, badge: null, description: 'Questions you\'ve asked' },
     { id: 'matched_questions', label: 'Answer Questions', icon: Users, badge: 2, description: 'Questions matched to your expertise' },
@@ -77,19 +139,22 @@ const Dashboard: React.FC = () => {
     { id: 'badges', label: 'Badges', icon: Trophy, badge: BadgeService.getRecentlyEarnedBadges().length, description: 'Your achievements and recognition' },
     { id: 'profile', label: 'My Profile', icon: User, badge: null, description: 'View and edit your profile' },
     { id: 'approvals', label: 'Approvals', icon: Users, badge: 1, description: 'Review new member applications' },
-    { id: 'invites', label: 'Invite Codes', icon: Plus, badge: null, description: 'Invite trusted connections' }
+    { id: 'invites', label: 'Invite Codes', icon: Plus, badge: null, description: 'Invite trusted connections' },
+    { id: 'preferences', label: 'Preferences', icon: Settings, badge: null, description: 'Customize your experience' }
   ];
 
   const renderContent = () => {
     switch (currentView) {
       case 'feed':
-        return <QuestionFeed view="all" />;
+        return <QuestionFeed view="all" isDemoMode={isDemoMode} />;
+      case 'explore_topics':
+        return <QuestionFeed view="explore_topics" isDemoMode={isDemoMode} />;
       case 'ask_question':
         return <QuestionComposer onQuestionCreated={() => handleViewChange('my_questions')} />;
       case 'my_questions':
-        return <QuestionFeed view="my_questions" />;
+        return <QuestionFeed view="my_questions" isDemoMode={isDemoMode} />;
       case 'matched_questions':
-        return <QuestionFeed view="matched_questions" />;
+        return <QuestionFeed view="matched_questions" isDemoMode={isDemoMode} />;
       case 'expertise':
         return <ExpertiseManager />;
       case 'auto_skills':
@@ -112,8 +177,10 @@ const Dashboard: React.FC = () => {
         return <PendingApprovals />;
       case 'invites':
         return <InviteCodeGenerator />;
+      case 'preferences':
+        return <PreferencesPage />;
       default:
-        return <QuestionFeed view="all" />;
+        return <QuestionFeed view="all" isDemoMode={isDemoMode} />;
     }
   };
 
@@ -130,6 +197,14 @@ const Dashboard: React.FC = () => {
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface-50">
@@ -195,6 +270,30 @@ const Dashboard: React.FC = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Demo Mode Toggle */}
+              {showDemoToggle && (
+                <button
+                  onClick={toggleDemoMode}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors duration-300 ${
+                    isDemoMode 
+                      ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {isDemoMode ? (
+                    <>
+                      <ToggleRight className="h-5 w-5" />
+                      <span className="text-sm font-medium">Demo Mode</span>
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="h-5 w-5" />
+                      <span className="text-sm font-medium">Demo Mode</span>
+                    </>
+                  )}
+                </button>
+              )}
+              
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-surface-400" />
                 <input
@@ -213,7 +312,10 @@ const Dashboard: React.FC = () => {
                 )}
               </button>
               
-              <button className="p-2 text-ink-light hover:text-ink-dark transition-colors duration-300">
+              <button 
+                onClick={() => handleViewChange('preferences')}
+                className="p-2 text-ink-light hover:text-ink-dark transition-colors duration-300"
+              >
                 <Settings className="h-6 w-6" />
               </button>
               
@@ -271,6 +373,28 @@ const Dashboard: React.FC = () => {
                     </button>
                   </div>
                 </div>
+
+                {/* Demo Mode Toggle (Mobile) */}
+                {showDemoToggle && (
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <button
+                      onClick={toggleDemoMode}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors duration-300 ${
+                        isDemoMode 
+                          ? 'bg-purple-100 text-purple-700' 
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        {isDemoMode ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+                        <span className="font-medium">Demo Mode</span>
+                      </div>
+                      <span className="text-xs">
+                        {isDemoMode ? 'On' : 'Off'}
+                      </span>
+                    </button>
+                  </div>
+                )}
 
                 {/* Navigation Items */}
                 <div className="flex-1 overflow-y-auto p-4">
