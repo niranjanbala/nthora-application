@@ -84,14 +84,15 @@ export async function getPreferences(userId?: string): Promise<UserPreferences> 
       .from('user_preferences')
       .select('preferences')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      // If no record found, return defaults
-      if (error.code === 'PGRST116') {
-        return DEFAULT_PREFERENCES;
-      }
       console.error('Error fetching preferences:', error);
+      return DEFAULT_PREFERENCES;
+    }
+
+    // If no record found, return defaults
+    if (!data) {
       return DEFAULT_PREFERENCES;
     }
 
