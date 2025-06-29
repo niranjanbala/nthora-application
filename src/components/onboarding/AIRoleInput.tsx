@@ -206,24 +206,32 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
           {/* Microphone button */}
           <div className="absolute right-3 bottom-3">
             {isRecording ? (
-              <button
-                onClick={handleStopRecording}
-                className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-                aria-label="Stop recording"
-              >
-                <StopCircle className="h-5 w-5" />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={handleStopRecording}
+                  className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors relative z-10"
+                  aria-label="Stop recording"
+                >
+                  <StopCircle className="h-5 w-5" />
+                </button>
+                {/* Pulsing recording animation */}
+                <div className="absolute inset-0 bg-red-400 rounded-full animate-ping opacity-75"></div>
+                <div className="absolute inset-1 bg-red-300 rounded-full animate-pulse opacity-50"></div>
+              </div>
             ) : isProcessingSpeech ? (
-              <div className="p-2 bg-purple-100 text-purple-600 rounded-full">
-                <Loader className="h-5 w-5 animate-spin" />
+              <div className="relative">
+                <div className="p-2 bg-purple-100 text-purple-600 rounded-full">
+                  <Loader className="h-5 w-5 animate-spin" />
+                </div>
+                <div className="absolute inset-0 bg-purple-200 rounded-full animate-pulse opacity-30"></div>
               </div>
             ) : (
               <button
                 onClick={handleStartRecording}
-                className="p-2 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition-colors"
+                className="p-2 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition-colors group"
                 aria-label="Start recording"
               >
-                <Mic className="h-5 w-5" />
+                <Mic className="h-5 w-5 group-hover:scale-110 transition-transform" />
               </button>
             )}
           </div>
@@ -254,9 +262,26 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
         )}
         
         {isRecording && (
-          <div className="mt-2 text-sm text-purple-600 flex items-center space-x-1">
-            <span className="inline-block h-2 w-2 bg-red-600 rounded-full animate-pulse"></span>
-            <span>Recording... Click the stop button when finished.</span>
+          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1">
+                <span className="inline-block h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
+                <span className="inline-block h-2 w-2 bg-red-400 rounded-full animate-pulse delay-75"></span>
+                <span className="inline-block h-2 w-2 bg-red-300 rounded-full animate-pulse delay-150"></span>
+              </div>
+              <span className="text-sm font-medium text-red-700">Recording in progress...</span>
+            </div>
+            <p className="text-xs text-red-600 mt-1">Speak clearly and click the stop button when finished.</p>
+          </div>
+        )}
+        
+        {isProcessingSpeech && (
+          <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Loader className="h-4 w-4 text-purple-600 animate-spin" />
+              <span className="text-sm font-medium text-purple-700">Processing your speech...</span>
+            </div>
+            <p className="text-xs text-purple-600 mt-1">Converting audio to text using AI.</p>
           </div>
         )}
       </div>

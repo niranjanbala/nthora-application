@@ -56,7 +56,7 @@ serve(async (req) => {
 
     // Create a File object from the binary data
     // Using File instead of Blob to be more explicit for FormData
-    const audioFile = new File([bytes.buffer], 'audio.webm', { type: mimeType });
+    const audioFile = new File([bytes.buffer], 'recording.webm', { type: mimeType });
     
     // --- Start Debugging Logs ---
     console.log('Audio File name:', audioFile.name);
@@ -66,8 +66,15 @@ serve(async (req) => {
 
     // Create a FormData object to send the audio file
     const formData = new FormData();
-    formData.append('audio', audioFile); // Append the File object directly
-    formData.append('model_id', 'whisper-1');
+    formData.append('file', audioFile); // ElevenLabs API expects 'file' parameter
+    formData.append('model_id', 'scribe_v1'); // ElevenLabs uses 'scribe_v1' model, not 'whisper-1'
+    
+    // --- Start Debugging Logs ---
+    console.log('FormData entries:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`${key}:`, value);
+    }
+    // --- End Debugging Logs ---
 
     // Call ElevenLabs API to convert speech to text
     const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
@@ -80,12 +87,28 @@ serve(async (req) => {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorText = await response.text().catch(() => 'Unknown error')
+      let errorData = {}
+      try {
+        errorData = JSON.parse(errorText)
+      } catch (e) {
+        // If it's not JSON, keep as text
+        errorData = { message: errorText }
+      }
+      
       // --- Start Debugging Logs ---
-      console.error('ElevenLabs API response not OK:', response.status, errorData);
+      console.error('ElevenLabs API response not OK:', response.status);
+      console.error('Response headers:', Object.fromEntries(response.headers.entries()));
+      console.error('Response body:', errorText);
+      console.error('Parsed error data:', errorData);
       // --- End Debugging Logs ---
+      
       return new Response(
-        JSON.stringify({ error: errorData.detail?.message || `ElevenLabs API error: ${response.status}` }),
+        JSON.stringify({ 
+          error: errorData.detail?.message || errorData.message || `ElevenLabs API error: ${response.status}`,
+          details: errorData,
+          status: response.status
+        }),
         { 
           status: response.status, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
