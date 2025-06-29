@@ -9,6 +9,7 @@ interface AIRoleInputProps {
   placeholder?: string;
   label?: string;
   description?: string;
+  id?: string;
 }
 
 const AIRoleInput: React.FC<AIRoleInputProps> = ({
@@ -16,7 +17,8 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
   onChange,
   placeholder = "Describe your current role and what you do...",
   label = "What best describes your current role?",
-  description = "Tell us about your position, responsibilities, and the type of work you do."
+  description = "Tell us about your position, responsibilities, and the type of work you do.",
+  id
 }) => {
   const [freeText, setFreeText] = useState('');
   const [parsedData, setParsedData] = useState<ParsedRole | null>(null);
@@ -193,6 +195,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
         
         <div className="relative">
           <textarea
+            id={id}
             value={freeText}
             onChange={handleTextChange}
             placeholder={placeholder}

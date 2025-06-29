@@ -9,6 +9,7 @@ interface AIIndustryInputProps {
   placeholder?: string;
   label?: string;
   description?: string;
+  id?: string;
 }
 
 const AIIndustryInput: React.FC<AIIndustryInputProps> = ({
@@ -16,7 +17,8 @@ const AIIndustryInput: React.FC<AIIndustryInputProps> = ({
   onChange,
   placeholder = "Describe the industry, company type, or market you work in...",
   label = "What industry or field do you work in?",
-  description = "Tell us about your industry, business model, company stage, or market focus."
+  description = "Tell us about your industry, business model, company stage, or market focus.",
+  id
 }) => {
   const [freeText, setFreeText] = useState('');
   const [parsedData, setParsedData] = useState<ParsedIndustry | null>(null);
@@ -199,6 +201,7 @@ const AIIndustryInput: React.FC<AIIndustryInputProps> = ({
         
         <div className="relative">
           <textarea
+            id={id}
             value={freeText}
             onChange={handleTextChange}
             placeholder={placeholder}
