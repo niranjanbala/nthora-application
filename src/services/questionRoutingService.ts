@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { openaiService, secureOpenaiService } from './openaiService';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Question {
   id: string;
@@ -583,7 +584,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         .from('questions')
         .upsert({
           ...question,
-          asker_id: question.title.slice(0, 36), // Use a consistent fake asker_id based on title
+          asker_id: uuidv4(), // Generate a proper UUID for each demo question
           visibility_level: 'public',
           is_anonymous: false,
           is_sensitive: false,
