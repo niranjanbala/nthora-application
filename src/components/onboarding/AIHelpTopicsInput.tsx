@@ -33,7 +33,7 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
   // Debounced parsing function
   const debouncedParse = useCallback(
     debounce(async (text: string) => {
-      if (text.length < 20) {
+      if (text.length < 10) {
         setParsedData(null);
         return;
       }
@@ -168,18 +168,19 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
       {/* AI-Powered Text Input */}
       <div className="relative">
         <div className="flex items-center space-x-2 mb-2">
-          <Sparkles className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-700">AI-Powered Analysis</span>
-          {isAnalyzing && <Loader className="h-4 w-4 text-blue-600 animate-spin" />}
+          <Sparkles className="h-4 w-4 text-purple-600" />
+          <span className="text-sm font-medium text-purple-700">AI-Powered Analysis</span>
+          {isAnalyzing && <Loader className="h-4 w-4 text-purple-600 animate-spin" />}
         </div>
         
         <div className="relative">
           <textarea
+            id="helpTopicsInput"
             value={freeText}
             onChange={handleTextChange}
             placeholder={placeholder}
             rows={4}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
             maxLength={500}
           />
           
@@ -194,13 +195,13 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
                 <StopCircle className="h-5 w-5" />
               </button>
             ) : isProcessingSpeech ? (
-              <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
+              <div className="p-2 bg-purple-100 text-purple-600 rounded-full">
                 <Loader className="h-5 w-5 animate-spin" />
               </div>
             ) : (
               <button
                 onClick={handleStartRecording}
-                className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                className="p-2 bg-purple-100 text-purple-600 rounded-full hover:bg-purple-200 transition-colors"
                 aria-label="Start recording"
               >
                 <Mic className="h-5 w-5" />
@@ -228,7 +229,7 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
         )}
         
         {isRecording && (
-          <div className="mt-2 text-sm text-blue-600 flex items-center space-x-1">
+          <div className="mt-2 text-sm text-purple-600 flex items-center space-x-1">
             <span className="inline-block h-2 w-2 bg-red-600 rounded-full animate-pulse"></span>
             <span>Recording... Click the stop button when finished.</span>
           </div>
@@ -237,15 +238,15 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
 
       {/* AI Analysis Results */}
       {parsedData && parsedData.tags.length > 0 && showSuggestions && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              <Sparkles className="h-5 w-5 text-blue-600" />
-              <span className="font-medium text-blue-900">AI Detected Help Topics</span>
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <span className="font-medium text-purple-900">AI Detected Help Topics</span>
             </div>
             <button
               onClick={acceptAllParsed}
-              className="text-sm bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors duration-300"
+              className="text-sm bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700 transition-colors duration-300"
             >
               Add All
             </button>
@@ -344,12 +345,12 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
             {value.map((topic) => (
               <span
                 key={topic}
-                className="bg-blue-100 text-blue-700 px-3 py-2 rounded-full text-sm flex items-center space-x-2"
+                className="bg-purple-100 text-purple-700 px-3 py-2 rounded-full text-sm flex items-center space-x-2"
               >
                 <span>{topic}</span>
                 <button
                   onClick={() => removeTopic(topic)}
-                  className="text-blue-500 hover:text-blue-700 font-bold"
+                  className="text-purple-500 hover:text-purple-700 font-bold"
                 >
                   ×
                 </button>
@@ -371,7 +372,7 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
               <input
                 type="text"
                 placeholder="e.g., Fundraising Strategy, Technical Architecture"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     const input = e.target as HTMLInputElement;

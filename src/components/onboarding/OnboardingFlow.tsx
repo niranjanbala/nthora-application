@@ -124,7 +124,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     };
   }, [currentAudio]);
 
-  // Auto-play audio when entering step 2 (currentStep = 1) or step 3 (currentStep = 2)
+  // Auto-play audio when entering step 2 (currentStep = 1), step 3 (currentStep = 2), or step 4 (currentStep = 3)
   useEffect(() => {
     if (currentStep === 1) {
       // Small delay to ensure UI is rendered
@@ -148,6 +148,18 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           expertiseAreas: [] // Reset to ensure we can detect any input
         });
         startProgressiveAudioStep3();
+      }, 500);
+      return () => clearTimeout(timer);
+    } else if (currentStep === 3) {
+      // Step 4 - Help Topics step
+      const timer = setTimeout(() => {
+        setPreviousData({ 
+          ...data,
+          helpTopics: [], // Reset to ensure we can detect any input
+          currentStruggles: '', // Reset current struggles
+          timestamp: Date.now() // Set timestamp for optional field timeout
+        });
+        startProgressiveAudioStep4();
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -215,6 +227,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           console.log('🎯 Checking expertiseAreas:', { currentLength: data.expertiseAreas.length, previousLength: previousData.expertiseAreas.length, shouldContinue });
           break;
       }
+    } else if (currentStep === 3) {
+      // Step 4 progressive audio logic
+      switch (audioStep) {
+        case 1: // Help Topics
+          shouldContinue = data.helpTopics.length > 0 && data.helpTopics.length !== previousData.helpTopics.length;
+          console.log('💬 Checking helpTopics:', { currentLength: data.helpTopics.length, previousLength: previousData.helpTopics.length, shouldContinue });
+          break;
+        case 2: // Current Struggles (optional - continue after 5 seconds timeout)
+          const timeSinceWaiting = Date.now() - (previousData.timestamp || 0);
+          shouldContinue = data.currentStruggles.trim() !== previousData.currentStruggles.trim() || timeSinceWaiting > 5000;
+          console.log('🤔 Checking currentStruggles:', { hasContent: data.currentStruggles.trim() !== '', isDifferent: data.currentStruggles.trim() !== previousData.currentStruggles.trim(), timeSinceWaiting, shouldContinue });
+          break;
+      }
     }
 
     if (shouldContinue) {
@@ -230,7 +255,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       // Debounce: Wait 2 seconds before continuing to next step
       progressTimerRef.current = setTimeout(() => {
         console.log('⏰ Timer triggered, continuing to next audio step:', audioStep + 1);
-        const maxSteps = currentStep === 1 ? 4 : currentStep === 2 ? 1 : 0; // Step 2 has 5 steps (0-4), Step 3 has 2 steps (0-1)
+        const maxSteps = currentStep === 1 ? 4 : currentStep === 2 ? 1 : currentStep === 3 ? 2 : 0; // Step 2 has 5 steps (0-4), Step 3 has 2 steps (0-1), Step 4 has 3 steps (0-2)
         if (audioStep < maxSteps) {
           setAudioStep(audioStep + 1);
           playProgressiveAudio(audioStep + 1);
@@ -245,7 +270,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     }
 
     // No cleanup needed since we're managing the timer manually
-  }, [data.fullName, data.primaryRole, data.additionalRoles.length, data.industries.length, data.expertiseAreas.length, isProgressiveAudio, waitingForInput, audioStep, previousData]);
+  }, [data.fullName, data.primaryRole, data.additionalRoles.length, data.industries.length, data.expertiseAreas.length, data.helpTopics.length, isProgressiveAudio, waitingForInput, audioStep, previousData]);
 
   const motivations = [
     { id: 'give_help', label: 'Give Help', icon: '🤝', description: 'Share my expertise with others' },
@@ -467,6 +492,18 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         default:
           return "";
       }
+    } else if (currentStep === 3) {
+      // Step 4 content - Help Topics
+      switch (step) {
+        case 0:
+          return "Now let's identify what you need help with. This helps us match you with the right experts who can provide valuable guidance.";
+        case 1:
+          return "Please describe what you need help with. Be specific about areas where you're seeking expertise, advice, or learning opportunities.";
+        case 2:
+          return "Optionally, you can also share what you're currently exploring or struggling with. This helps us show you how our AI matching works.";
+        default:
+          return "";
+      }
     }
     return "";
   };
@@ -490,6 +527,17 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     setIsProgressiveAudio(true);
     setAudioStep(0);
     console.log('Playing audio step 0 for expertise');
+    await playProgressiveAudio(0);
+  };
+
+  // Start progressive audio playback for step 4
+  const startProgressiveAudioStep4 = async () => {
+    console.log('Starting progressive audio for step 4:', currentStep);
+    if (currentStep !== 3) return;
+    
+    setIsProgressiveAudio(true);
+    setAudioStep(0);
+    console.log('Playing audio step 0 for help topics');
     await playProgressiveAudio(0);
   };
 
@@ -556,6 +604,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             console.log('🎯 Expertise step 1 ended - Focusing expertiseInput and waiting for input');
             focusInput('expertiseInput');
             setWaitingForInput(true);
+          }
+        } else if (currentStep === 3) {
+          // Step 4 progressive audio focus logic
+          if (step === 1) {
+            console.log('🎯 Help topics step 1 ended - Focusing helpTopicsInput and waiting for input');
+            focusInput('helpTopicsInput');
+            setWaitingForInput(true);
+          } else if (step === 2) {
+            console.log('🎯 Help topics step 2 ended - Focusing currentStrugglesInput (optional)');
+            focusInput('currentStrugglesInput');
+            setWaitingForInput(true);
+            // Set timestamp for step 2 timeout since it's optional
+            setPreviousData(prev => prev ? { ...prev, timestamp: Date.now() } : null);
           }
         }
         
@@ -628,6 +689,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       } else {
         // Start progressive audio for step 3
         await startProgressiveAudioStep3();
+        return;
+      }
+    }
+
+    // If this is step 4 and we're clicking the audio button, start progressive audio
+    if (currentStep === 3 && text === getStepAudioContent()) {
+      if (isProgressiveAudio) {
+        // Stop progressive audio
+        stopCurrentAudio();
+        return;
+      } else {
+        // Start progressive audio for step 4
+        await startProgressiveAudioStep4();
         return;
       }
     }
@@ -885,6 +959,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">What are you currently exploring or struggling with? (Optional)</label>
               <textarea
+                id="currentStrugglesInput"
                 value={data.currentStruggles}
                 onChange={(e) => updateData({ currentStruggles: e.target.value })}
                 placeholder="e.g., Scaling our engineering team, choosing the right pricing model, navigating Series A..."
@@ -1244,6 +1319,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                       `Audio guide active - Step ${audioStep} of 5`
                     ) : currentStep === 2 ? (
                       audioStep === 0 ? 'Audio guide active - Introduction' : 'Audio guide active - Step 1 of 1'
+                    ) : currentStep === 3 ? (
+                      audioStep === 0 ? 'Audio guide active - Introduction' : audioStep === 1 ? 'Audio guide active - Step 1 of 2' : 'Audio guide active - Step 2 of 2'
                     ) : (
                       'Audio guide active'
                     )}
