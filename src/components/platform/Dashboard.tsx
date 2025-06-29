@@ -17,6 +17,7 @@ import UserNetworkBadges from '../profile/UserNetworkBadges';
 import NetworkDepthBadges from '../badges/NetworkDepthBadges';
 import NetworkActivityFeed from '../network/NetworkActivityFeed';
 import AutoDetectedSkills from '../network/AutoDetectedSkills';
+import PreferencesPage from '../../pages/PreferencesPage';
 import { signOut } from '../../services/authService';
 
 type DashboardView = 
@@ -34,7 +35,8 @@ type DashboardView =
   | 'network_badges'
   | 'network_depth'
   | 'network_activity'
-  | 'auto_skills';
+  | 'auto_skills'
+  | 'preferences';
 
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -77,7 +79,8 @@ const Dashboard: React.FC = () => {
     { id: 'badges', label: 'Badges', icon: Trophy, badge: BadgeService.getRecentlyEarnedBadges().length, description: 'Your achievements and recognition' },
     { id: 'profile', label: 'My Profile', icon: User, badge: null, description: 'View and edit your profile' },
     { id: 'approvals', label: 'Approvals', icon: Users, badge: 1, description: 'Review new member applications' },
-    { id: 'invites', label: 'Invite Codes', icon: Plus, badge: null, description: 'Invite trusted connections' }
+    { id: 'invites', label: 'Invite Codes', icon: Plus, badge: null, description: 'Invite trusted connections' },
+    { id: 'preferences', label: 'Preferences', icon: Settings, badge: null, description: 'Customize your experience' }
   ];
 
   const renderContent = () => {
@@ -112,6 +115,8 @@ const Dashboard: React.FC = () => {
         return <PendingApprovals />;
       case 'invites':
         return <InviteCodeGenerator />;
+      case 'preferences':
+        return <PreferencesPage />;
       default:
         return <QuestionFeed view="all" />;
     }
@@ -213,7 +218,10 @@ const Dashboard: React.FC = () => {
                 )}
               </button>
               
-              <button className="p-2 text-ink-light hover:text-ink-dark transition-colors duration-300">
+              <button 
+                onClick={() => handleViewChange('preferences')}
+                className="p-2 text-ink-light hover:text-ink-dark transition-colors duration-300"
+              >
                 <Settings className="h-6 w-6" />
               </button>
               
