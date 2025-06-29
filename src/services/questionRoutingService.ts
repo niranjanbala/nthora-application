@@ -492,9 +492,6 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
       }
     }
 
-    // First ensure demo user profiles exist
-    await seedDemoUserProfiles();
-
     // Sample demo questions to seed
     const demoQuestions = [
       {
@@ -612,7 +609,7 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
       return { success: false, error: demoQuestionError?.message || 'Failed to fetch demo question IDs' };
     }
 
-    // Seed responses for each demo question
+    // Seed responses for each demo question (without creating demo user profiles)
     for (const question of demoQuestionData) {
       await seedDemoResponses(question.id);
     }
@@ -621,82 +618,6 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
   } catch (error) {
     console.error('Error seeding demo questions:', error);
     return { success: false, error: 'Failed to seed demo questions' };
-  }
-}
-
-// Seed demo user profiles for responses
-async function seedDemoUserProfiles(): Promise<void> {
-  try {
-    // Define demo user profiles
-    const demoProfiles = [
-      {
-        id: DEMO_USERS.EXPERT_1,
-        email: 'expert1@example.com',
-        full_name: 'Dr. Sarah Chen',
-        bio: 'Senior Product Leader with 15+ years experience in SaaS and enterprise software. Previously VP Product at Salesforce and Director at Microsoft.',
-        expertise_areas: ['Product Strategy', 'SaaS', 'Enterprise Software', 'Leadership'],
-        role: 'member',
-        membership_status: 'active'
-      },
-      {
-        id: DEMO_USERS.EXPERT_2,
-        email: 'expert2@example.com',
-        full_name: 'Marcus Rodriguez',
-        bio: 'Engineering Manager specializing in scalable architecture and DevOps. 10 years experience building high-performance systems.',
-        expertise_areas: ['Engineering', 'DevOps', 'Architecture', 'Scaling'],
-        role: 'member',
-        membership_status: 'active'
-      },
-      {
-        id: DEMO_USERS.EXPERT_3,
-        email: 'expert3@example.com',
-        full_name: 'Jamie Taylor',
-        bio: 'Growth Marketing Specialist with experience at early-stage startups. Focus on customer acquisition and retention strategies.',
-        expertise_areas: ['Marketing', 'Growth', 'Customer Acquisition', 'Analytics'],
-        role: 'member',
-        membership_status: 'active'
-      },
-      {
-        id: DEMO_USERS.FIRST_DEGREE,
-        email: 'connection1@example.com',
-        full_name: 'Alex Morgan',
-        bio: 'First-degree connection with expertise in finance and operations.',
-        expertise_areas: ['Finance', 'Operations', 'Strategy'],
-        role: 'member',
-        membership_status: 'active'
-      },
-      {
-        id: DEMO_USERS.SECOND_DEGREE,
-        email: 'connection2@example.com',
-        full_name: 'Jordan Lee',
-        bio: 'Second-degree connection specializing in product design and UX research.',
-        expertise_areas: ['Design', 'UX Research', 'Product'],
-        role: 'member',
-        membership_status: 'active'
-      },
-      {
-        id: DEMO_USERS.THIRD_DEGREE,
-        email: 'connection3@example.com',
-        full_name: 'Taylor Smith',
-        bio: 'Third-degree connection with background in data science and AI.',
-        expertise_areas: ['Data Science', 'AI', 'Machine Learning'],
-        role: 'member',
-        membership_status: 'active'
-      }
-    ];
-
-    // Upsert each demo profile
-    for (const profile of demoProfiles) {
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert(profile, { onConflict: 'id' });
-
-      if (error) {
-        console.error(`Error upserting demo profile ${profile.full_name}:`, error);
-      }
-    }
-  } catch (error) {
-    console.error('Error seeding demo user profiles:', error);
   }
 }
 
@@ -724,12 +645,19 @@ async function seedDemoResponses(questionId: string): Promise<void> {
       return; // Responses already exist
     }
     
-    // Create a mix of responses for this question
+    // Get current user to use as responder (this avoids RLS issues)
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) {
+      console.log('No authenticated user, skipping demo response seeding');
+      return;
+    }
+    
+    // Create a mix of responses for this question using the current user as responder
     const responses = [
-      // High quality human response from 1st degree connection
+      // High quality human response
       {
         question_id: questionId,
-        responder_id: DEMO_USERS.EXPERT_1,
+        responder_id: user.user.id,
         content: DEMO_RESPONSES.HIGH_QUALITY[0].content,
         response_type: DEMO_RESPONSES.HIGH_QUALITY[0].response_type,
         helpful_votes: DEMO_RESPONSES.HIGH_QUALITY[0].helpful_votes,
@@ -740,10 +668,10 @@ async function seedDemoResponses(questionId: string): Promise<void> {
         updated_at: new Date(Date.now() - 3600000 * 24).toISOString()
       },
       
-      // Another high quality human response from 1st degree connection
+      // Another high quality human response
       {
         question_id: questionId,
-        responder_id: DEMO_USERS.FIRST_DEGREE,
+        responder_id: user.user.id,
         content: DEMO_RESPONSES.HIGH_QUALITY[1].content,
         response_type: DEMO_RESPONSES.HIGH_QUALITY[1].response_type,
         helpful_votes: DEMO_RESPONSES.HIGH_QUALITY[1].helpful_votes,
@@ -754,10 +682,10 @@ async function seedDemoResponses(questionId: string): Promise<void> {
         updated_at: new Date(Date.now() - 3600000 * 12).toISOString()
       },
       
-      // Medium quality AI response from 2nd degree connection
+      // Medium quality AI response
       {
         question_id: questionId,
-        responder_id: DEMO_USERS.SECOND_DEGREE,
+        responder_id: user.user.id,
         content: DEMO_RESPONSES.MEDIUM_QUALITY[0].content,
         response_type: DEMO_RESPONSES.MEDIUM_QUALITY[0].response_type,
         helpful_votes: DEMO_RESPONSES.MEDIUM_QUALITY[0].helpful_votes,
@@ -767,21 +695,6 @@ async function seedDemoResponses(questionId: string): Promise<void> {
         quality_level: DEMO_RESPONSES.MEDIUM_QUALITY[0].quality_level,
         created_at: new Date(Date.now() - 3600000 * 6).toISOString(), // 6 hours ago
         updated_at: new Date(Date.now() - 3600000 * 6).toISOString()
-      },
-      
-      // Low quality AI response from 3rd degree connection
-      {
-        question_id: questionId,
-        responder_id: DEMO_USERS.THIRD_DEGREE,
-        content: DEMO_RESPONSES.LOW_QUALITY[0].content,
-        response_type: DEMO_RESPONSES.LOW_QUALITY[0].response_type,
-        helpful_votes: DEMO_RESPONSES.LOW_QUALITY[0].helpful_votes,
-        unhelpful_votes: DEMO_RESPONSES.LOW_QUALITY[0].unhelpful_votes,
-        quality_score: DEMO_RESPONSES.LOW_QUALITY[0].quality_score,
-        source_type: DEMO_RESPONSES.LOW_QUALITY[0].source_type,
-        quality_level: DEMO_RESPONSES.LOW_QUALITY[0].quality_level,
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString(), // 2 hours ago
-        updated_at: new Date(Date.now() - 3600000 * 2).toISOString()
       }
     ];
     
