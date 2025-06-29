@@ -29,6 +29,7 @@ export interface UserPreferences {
     autoDetectSkills?: boolean;
     showConfidenceScores?: boolean;
   };
+  demoMode?: boolean;
 }
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
@@ -59,7 +60,8 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
     defaultMaxQuestionsPerWeek: 10,
     autoDetectSkills: true,
     showConfidenceScores: true
-  }
+  },
+  demoMode: true
 };
 
 /**

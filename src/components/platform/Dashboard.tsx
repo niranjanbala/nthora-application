@@ -19,6 +19,8 @@ import NetworkActivityFeed from '../network/NetworkActivityFeed';
 import AutoDetectedSkills from '../network/AutoDetectedSkills';
 import PreferencesPage from '../../pages/PreferencesPage';
 import { signOut } from '../../services/authService';
+import { getRealQuestionCount } from '../../services/questionRoutingService';
+import { getPreferences, updatePreferences } from '../../services/preferenceService';
 
 type DashboardView = 
   | 'feed' 
@@ -44,8 +46,49 @@ const Dashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState<DashboardView>('feed');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(true); // Default to true
+  const [realQuestionCount, setRealQuestionCount] = useState(0);
+  const [showDemoToggle, setShowDemoToggle] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Load real question count and user preferences on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        // Get count of real questions
+        const count = await getRealQuestionCount();
+        setRealQuestionCount(count);
+        
+        // Get user preferences
+        const preferences = await getPreferences();
+        
+        // Determine initial demo mode state
+        let initialDemoMode = true;
+        
+        if (count === 0) {
+          // If no real questions, force demo mode on
+          initialDemoMode = true;
+        } else if (count >= 10) {
+          // If 10+ real questions, hide demo mode
+          initialDemoMode = false;
+          setShowDemoToggle(false);
+        } else {
+          // Between 1-9 questions, use user preference with fallback to true
+          initialDemoMode = preferences.demoMode !== undefined ? preferences.demoMode : true;
+        }
+        
+        setIsDemoMode(initialDemoMode);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadInitialData();
+  }, []);
 
   // Handle URL-based view changes
   useEffect(() => {
@@ -68,8 +111,18 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const toggleDemoMode = () => {
-    setIsDemoMode(!isDemoMode);
+  const toggleDemoMode = async () => {
+    const newDemoMode = !isDemoMode;
+    setIsDemoMode(newDemoMode);
+    
+    // Save preference if we have real questions
+    if (realQuestionCount > 0) {
+      try {
+        await updatePreferences({ demoMode: newDemoMode });
+      } catch (error) {
+        console.error('Error saving demo mode preference:', error);
+      }
+    }
   };
 
   const navigationItems = [
@@ -145,6 +198,14 @@ const Dashboard: React.FC = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-surface-50">
       {/* Mobile Header */}
@@ -210,26 +271,28 @@ const Dashboard: React.FC = () => {
             
             <div className="flex items-center space-x-4">
               {/* Demo Mode Toggle */}
-              <button
-                onClick={toggleDemoMode}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors duration-300 ${
-                  isDemoMode 
-                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {isDemoMode ? (
-                  <>
-                    <ToggleRight className="h-5 w-5" />
-                    <span className="text-sm font-medium">Demo Mode</span>
-                  </>
-                ) : (
-                  <>
-                    <ToggleLeft className="h-5 w-5" />
-                    <span className="text-sm font-medium">Demo Mode</span>
-                  </>
-                )}
-              </button>
+              {showDemoToggle && (
+                <button
+                  onClick={toggleDemoMode}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors duration-300 ${
+                    isDemoMode 
+                      ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {isDemoMode ? (
+                    <>
+                      <ToggleRight className="h-5 w-5" />
+                      <span className="text-sm font-medium">Demo Mode</span>
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="h-5 w-5" />
+                      <span className="text-sm font-medium">Demo Mode</span>
+                    </>
+                  )}
+                </button>
+              )}
               
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-surface-400" />
@@ -312,24 +375,26 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Demo Mode Toggle (Mobile) */}
-                <div className="px-4 py-3 border-b border-gray-200">
-                  <button
-                    onClick={toggleDemoMode}
-                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors duration-300 ${
-                      isDemoMode 
-                        ? 'bg-purple-100 text-purple-700' 
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      {isDemoMode ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
-                      <span className="font-medium">Demo Mode</span>
-                    </div>
-                    <span className="text-xs">
-                      {isDemoMode ? 'On' : 'Off'}
-                    </span>
-                  </button>
-                </div>
+                {showDemoToggle && (
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <button
+                      onClick={toggleDemoMode}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors duration-300 ${
+                        isDemoMode 
+                          ? 'bg-purple-100 text-purple-700' 
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        {isDemoMode ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+                        <span className="font-medium">Demo Mode</span>
+                      </div>
+                      <span className="text-xs">
+                        {isDemoMode ? 'On' : 'Off'}
+                      </span>
+                    </button>
+                  </div>
+                )}
 
                 {/* Navigation Items */}
                 <div className="flex-1 overflow-y-auto p-4">

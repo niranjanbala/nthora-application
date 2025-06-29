@@ -357,6 +357,25 @@ export async function getDemoQuestions(category?: string): Promise<Question[]> {
   }
 }
 
+// Get count of real questions in the database
+export async function getRealQuestionCount(): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('questions')
+      .select('*', { count: 'exact', head: true });
+    
+    if (error) {
+      console.error('Error counting real questions:', error);
+      return 0;
+    }
+    
+    return count || 0;
+  } catch (error) {
+    console.error('Error counting real questions:', error);
+    return 0;
+  }
+}
+
 // Seed demo questions into the database
 export async function seedDemoQuestions(): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
