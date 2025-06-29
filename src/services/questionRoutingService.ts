@@ -235,21 +235,32 @@ export async function getAllQuestions(): Promise<Question[]> {
 export async function getExploreTopicsQuestions(): Promise<Question[]> {
   try {
     const { data: user } = await supabase.auth.getUser();
-    if (!user.user) return [];
-
-    // Get user profile to access expertise areas and help topics
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('expertise_areas, onboarding_details')
-      .eq('id', user.user.id)
-      .single();
-
-    if (profileError) {
-      console.error('Error fetching user profile:', profileError);
+    if (!user.user) {
+      console.warn('User not authenticated for explore topics');
       return [];
     }
 
-    // Extract expertise areas and help topics
+    // Get user profile to access expertise areas and help topics
+    let profile = null;
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('expertise_areas, onboarding_details')
+        .eq('id', user.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+        // Don't throw here, continue with fallback behavior
+      } else {
+        profile = profileData;
+      }
+    } catch (fetchError) {
+      console.error('Network error fetching user profile:', fetchError);
+      // Continue with fallback behavior instead of failing
+    }
+
+    // Extract expertise areas and help topics with fallback
     const expertiseAreas = profile?.expertise_areas || [];
     const helpTopics = profile?.onboarding_details?.helpTopics || [];
     
@@ -257,7 +268,8 @@ export async function getExploreTopicsQuestions(): Promise<Question[]> {
     const relevantTags = [...expertiseAreas, ...helpTopics];
     
     if (relevantTags.length === 0) {
-      // If no tags, return recent questions
+      // If no tags or profile fetch failed, return recent questions
+      console.log('No relevant tags found, falling back to recent questions');
       return await getAllQuestions();
     }
 
@@ -271,6 +283,7 @@ export async function getExploreTopicsQuestions(): Promise<Question[]> {
 
     if (error) {
       console.error('Error fetching explore topics questions:', error);
+      // Fallback to empty array instead of throwing
       return [];
     }
 
@@ -288,6 +301,7 @@ export async function getExploreTopicsQuestions(): Promise<Question[]> {
     return matchedQuestions;
   } catch (error) {
     console.error('Error fetching explore topics questions:', error);
+    // Return empty array as fallback instead of throwing
     return [];
   }
 }
