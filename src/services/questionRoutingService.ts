@@ -250,6 +250,137 @@ export async function getAllQuestions(): Promise<Question[]> {
   }
 }
 
+// Get demo questions
+export async function getDemoQuestions(): Promise<Question[]> {
+  try {
+    const { data, error } = await supabase
+      .from('demo_questions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Error fetching demo questions:', error);
+      return [];
+    }
+
+    return (data || []).map(item => ({
+      ...item,
+      asker_id: item.id, // Use demo question id as asker_id for consistency
+    })) as Question[];
+  } catch (error) {
+    console.error('Error fetching demo questions:', error);
+    return [];
+  }
+}
+
+// Get questions for explore topics based on user interests
+export async function getExploreTopicsQuestions(topics: string[] = []): Promise<Question[]> {
+  try {
+    // If no topics provided, get all demo questions
+    if (topics.length === 0) {
+      return await getDemoQuestions();
+    }
+
+    // Get demo questions that match the provided topics
+    const { data, error } = await supabase
+      .from('demo_questions')
+      .select('*')
+      .or(topics.map(topic => `primary_tags.cs.{${topic}}`).join(','))
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Error fetching explore topics questions:', error);
+      return [];
+    }
+
+    return (data || []).map(item => ({
+      ...item,
+      asker_id: item.id, // Use demo question id as asker_id for consistency
+    })) as Question[];
+  } catch (error) {
+    console.error('Error fetching explore topics questions:', error);
+    return [];
+  }
+}
+
+// Get count of real questions (non-demo)
+export async function getRealQuestionCount(): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('questions')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      console.error('Error fetching real question count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error('Error fetching real question count:', error);
+    return 0;
+  }
+}
+
+// Seed demo questions if they don't exist
+export async function seedDemoQuestions(): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if demo questions already exist
+    const { count } = await supabase
+      .from('demo_questions')
+      .select('*', { count: 'exact', head: true });
+
+    if (count && count > 0) {
+      return { success: true }; // Already seeded
+    }
+
+    // Sample demo questions to seed
+    const demoQuestions = [
+      {
+        title: "How to scale a SaaS product from 100 to 1000 customers?",
+        content: "We've successfully grown our SaaS platform to 100 paying customers, but we're hitting some scaling challenges. What are the key operational, technical, and strategic considerations for growing to 1000 customers?",
+        primary_tags: ["saas", "scaling", "growth"],
+        secondary_tags: ["operations", "strategy", "customer-success"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        category: "business-growth"
+      },
+      {
+        title: "Best practices for remote team management in 2024?",
+        content: "Leading a distributed team of 15 people across different time zones. Looking for proven strategies to maintain productivity, culture, and team cohesion.",
+        primary_tags: ["remote-work", "management", "leadership"],
+        secondary_tags: ["productivity", "culture", "communication"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "management"
+      },
+      {
+        title: "Fundraising strategy for B2B marketplace?",
+        content: "Building a B2B marketplace connecting manufacturers with suppliers. We have early traction but need to raise Series A. What should our fundraising strategy look like?",
+        primary_tags: ["fundraising", "b2b", "marketplace"],
+        secondary_tags: ["venture-capital", "strategy", "growth"],
+        expected_answer_type: "strategic",
+        urgency_level: "high",
+        category: "fundraising"
+      }
+    ];
+
+    const { error } = await supabase
+      .from('demo_questions')
+      .insert(demoQuestions);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: 'Failed to seed demo questions' };
+  }
+}
+
 // Get expert matches for a question
 export async function getQuestionMatches(questionId: string): Promise<QuestionMatch[]> {
   const { data, error } = await supabase
