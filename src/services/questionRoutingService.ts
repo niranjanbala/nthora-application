@@ -161,6 +161,26 @@ export async function createQuestion(
 // Get question by ID
 export async function getQuestionById(questionId: string): Promise<Question | null> {
   try {
+    // Check if it's a demo question ID (starts with 'demo-')
+    if (questionId.startsWith('demo-')) {
+      const { data, error } = await supabase
+        .from('demo_questions')
+        .select('*')
+        .eq('id', questionId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching demo question:', error);
+        return null;
+      }
+
+      return {
+        ...data,
+        asker_id: 'demo-user' // Add a placeholder asker_id since it's not in the demo table
+      };
+    }
+
+    // Regular question
     const { data, error } = await supabase
       .from('questions')
       .select('*')
@@ -303,6 +323,279 @@ export async function getExploreTopicsQuestions(): Promise<Question[]> {
     console.error('Error fetching explore topics questions:', error);
     // Return empty array as fallback instead of throwing
     return [];
+  }
+}
+
+// Get demo questions from the database
+export async function getDemoQuestions(category?: string): Promise<Question[]> {
+  try {
+    let query = supabase
+      .from('demo_questions')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    // Filter by category if provided
+    if (category) {
+      query = query.eq('category', category);
+    }
+    
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching demo questions:', error);
+      return [];
+    }
+
+    // Add asker_id since it's not in the demo_questions table
+    return (data || []).map(q => ({
+      ...q,
+      asker_id: 'demo-user'
+    }));
+  } catch (error) {
+    console.error('Error fetching demo questions:', error);
+    return [];
+  }
+}
+
+// Seed demo questions into the database
+export async function seedDemoQuestions(): Promise<{ success: boolean; count?: number; error?: string }> {
+  try {
+    // Check if we already have demo questions
+    const { count, error: countError } = await supabase
+      .from('demo_questions')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('Error checking demo questions count:', countError);
+      return { success: false, error: countError.message };
+    }
+    
+    // If we already have demo questions, don't seed again
+    if (count && count > 0) {
+      console.log(`${count} demo questions already exist, skipping seed`);
+      return { success: true, count };
+    }
+    
+    // Demo questions for different categories
+    const demoQuestions = [
+      // General feed questions
+      {
+        title: "How to implement a scalable microservice architecture?",
+        content: "I'm working on a project that's growing rapidly and we need to move from our monolith to microservices. What's the best approach to ensure scalability while minimizing disruption?",
+        primary_tags: ["Microservices", "Architecture", "Scalability"],
+        secondary_tags: ["DevOps", "Cloud"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 42,
+        response_count: 3,
+        helpful_votes: 5,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree",
+        category: "all"
+      },
+      {
+        title: "Best practices for React performance optimization?",
+        content: "Our React application is getting slower as we add more features. What are the current best practices for optimizing React performance in 2025? Specifically looking at state management, rendering optimization, and code splitting strategies.",
+        primary_tags: ["React", "Performance", "Frontend"],
+        secondary_tags: ["JavaScript", "Optimization"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 38,
+        response_count: 5,
+        helpful_votes: 12,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree",
+        category: "all"
+      },
+      {
+        title: "Fundraising strategies for AI startups in the current market",
+        content: "We're an early-stage AI startup focused on healthcare applications. Given the current market conditions, what fundraising strategies would you recommend? Looking for advice on valuation expectations, investor targeting, and pitch deck focus areas.",
+        primary_tags: ["Fundraising", "AI", "Startups"],
+        secondary_tags: ["Healthcare", "Venture Capital"],
+        expected_answer_type: "strategic",
+        urgency_level: "high",
+        status: "active",
+        view_count: 65,
+        response_count: 7,
+        helpful_votes: 18,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree",
+        category: "all"
+      },
+      
+      // Matched questions
+      {
+        title: "Optimizing PostgreSQL for high-write applications",
+        content: "We're building an IoT platform that needs to handle thousands of writes per second to PostgreSQL. What optimizations should we consider for this high-write scenario?",
+        primary_tags: ["PostgreSQL", "Database", "Performance"],
+        secondary_tags: ["IoT", "Scaling"],
+        expected_answer_type: "tactical",
+        urgency_level: "high",
+        status: "active",
+        view_count: 37,
+        response_count: 3,
+        helpful_votes: 8,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree",
+        category: "matched_questions"
+      },
+      {
+        title: "Implementing a design system at scale",
+        content: "We're a growing company with multiple product teams and need to implement a cohesive design system. What's the best approach to create, document, and ensure adoption of a design system across teams?",
+        primary_tags: ["Design Systems", "UX/UI", "Frontend"],
+        secondary_tags: ["Collaboration", "Documentation"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 45,
+        response_count: 6,
+        helpful_votes: 17,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree",
+        category: "matched_questions"
+      },
+      
+      // My questions
+      {
+        title: "Best approach for transitioning from monolith to microservices?",
+        content: "Our team is considering breaking up our monolithic application into microservices. What strategies have worked well for making this transition while keeping the application running?",
+        primary_tags: ["Microservices", "Architecture", "Migration"],
+        secondary_tags: ["DevOps", "Refactoring"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 52,
+        response_count: 7,
+        helpful_votes: 15,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree",
+        category: "my_questions"
+      },
+      {
+        title: "Effective strategies for technical debt management",
+        content: "Our codebase has accumulated significant technical debt over the years. What approaches have worked for you to systematically address tech debt while still delivering new features?",
+        primary_tags: ["Technical Debt", "Code Quality", "Engineering"],
+        secondary_tags: ["Refactoring", "Process"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "answered",
+        view_count: 63,
+        response_count: 8,
+        helpful_votes: 22,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree",
+        category: "my_questions"
+      },
+      
+      // Explore topics
+      {
+        title: "Implementing a zero-knowledge proof system for identity verification",
+        content: "We're building a privacy-focused identity verification system and want to implement zero-knowledge proofs. What libraries or approaches would you recommend for a production system?",
+        primary_tags: ["Zero-Knowledge Proofs", "Cryptography", "Identity"],
+        secondary_tags: ["Privacy", "Security"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 39,
+        response_count: 4,
+        helpful_votes: 11,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree",
+        category: "explore_topics"
+      },
+      {
+        title: "Strategies for reducing ML model latency in production",
+        content: "Our ML models are taking too long to generate predictions in production. What techniques have you used to reduce inference latency while maintaining accuracy?",
+        primary_tags: ["Machine Learning", "Performance", "MLOps"],
+        secondary_tags: ["Optimization", "Production"],
+        expected_answer_type: "tactical",
+        urgency_level: "high",
+        status: "active",
+        view_count: 47,
+        response_count: 6,
+        helpful_votes: 14,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree",
+        category: "explore_topics"
+      },
+      
+      // Additional general questions
+      {
+        title: "How to build an effective data science team?",
+        content: "I'm tasked with building out our data science capabilities from scratch. What roles should I prioritize hiring for? How should I structure the team? Any advice on interview processes for data scientists?",
+        primary_tags: ["Data Science", "Team Building", "Hiring"],
+        secondary_tags: ["Leadership", "ML"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 29,
+        response_count: 4,
+        helpful_votes: 8,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree",
+        category: "all"
+      },
+      {
+        title: "Implementing zero-trust security in a hybrid cloud environment",
+        content: "We're moving to a hybrid cloud setup and want to implement zero-trust security principles. What are the key components we should focus on? Any specific tools or frameworks you'd recommend?",
+        primary_tags: ["Security", "Zero Trust", "Cloud"],
+        secondary_tags: ["DevSecOps", "Compliance"],
+        expected_answer_type: "tactical",
+        urgency_level: "high",
+        status: "active",
+        view_count: 47,
+        response_count: 6,
+        helpful_votes: 15,
+        is_anonymous: false,
+        is_sensitive: true,
+        visibility_level: "first_degree",
+        category: "all"
+      },
+      {
+        title: "Product-led growth strategies for B2B SaaS",
+        content: "We're pivoting our B2B SaaS from a traditional sales-led approach to product-led growth. What are the key metrics we should track? How should we adjust our onboarding and pricing? Any success stories or cautionary tales would be appreciated.",
+        primary_tags: ["Product-Led Growth", "SaaS", "B2B"],
+        secondary_tags: ["Marketing", "Onboarding"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 53,
+        response_count: 8,
+        helpful_votes: 21,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree",
+        category: "all"
+      }
+    ];
+    
+    // Insert demo questions
+    const { data, error } = await supabase
+      .from('demo_questions')
+      .insert(demoQuestions)
+      .select();
+    
+    if (error) {
+      console.error('Error seeding demo questions:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, count: data.length };
+  } catch (error) {
+    console.error('Error seeding demo questions:', error);
+    return { success: false, error: 'Failed to seed demo questions' };
   }
 }
 
