@@ -596,7 +596,7 @@ export async function getQuestionResponses(questionId: string): Promise<Question
         .from('question_responses')
         .select(`
           *,
-          responder:users!responder_id(id)
+          responder:user_profiles!responder_id(id)
         `)
         .eq('question_id', questionId)
         .order('created_at', { ascending: false });
@@ -641,7 +641,7 @@ export async function getQuestionResponses(questionId: string): Promise<Question
         .from('question_responses')
         .select(`
           *,
-          responder:users!responder_id(id)
+          responder:user_profiles!responder_id(id)
         `)
         .eq('question_id', questionId)
         .order('created_at', { ascending: false });
