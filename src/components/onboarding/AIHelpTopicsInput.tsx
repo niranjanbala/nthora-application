@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Sparkles, CheckCircle, Loader, AlertTriangle, Target, BookOpen, TrendingUp, Mic, StopCircle } from 'lucide-react';
 import { parseHelpTopicsText, debounce, type ParsedHelpTopics } from '../../services/aiParsingService';
 import { elevenLabsService } from '../../services/elevenLabsService';
@@ -26,7 +26,7 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
   // Speech-to-text state
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [isProcessingSpeech, setIsProcessingSpeech] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
 
@@ -89,7 +89,7 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
   // Speech-to-text functions
   const handleStartRecording = async () => {
     setRecordingError(null);
-    setAudioChunks([]);
+    audioChunksRef.current = [];
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -97,7 +97,7 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
       
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          setAudioChunks(prev => [...prev, event.data]);
+          audioChunksRef.current.push(event.data);
         }
       };
       
@@ -128,12 +128,12 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
   };
 
   const handleProcessRecording = async () => {
-    if (audioChunks.length === 0) return;
+    if (audioChunksRef.current.length === 0) return;
     
     setIsProcessingSpeech(true);
     try {
       // Combine audio chunks into a single blob
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       
       // Send to speech-to-text service
       const result = await elevenLabsService.speechToText(audioBlob);
@@ -150,7 +150,7 @@ const AIHelpTopicsInput: React.FC<AIHelpTopicsInputProps> = ({
       console.error('Error processing recording:', error);
       setRecordingError('Error processing your speech. Please try again.');
     } finally {
-      setAudioChunks([]);
+      audioChunksRef.current = [];
       setIsProcessingSpeech(false);
     }
   };

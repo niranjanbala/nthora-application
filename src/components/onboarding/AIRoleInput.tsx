@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Sparkles, CheckCircle, Loader, Briefcase, TrendingUp, Users, Building, Mic, StopCircle, AlertTriangle } from 'lucide-react';
 import { parseRoleText, debounce, type ParsedRole } from '../../services/aiParsingService';
 import { elevenLabsService } from '../../services/elevenLabsService';
@@ -27,7 +27,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
   // Speech-to-text state
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [isProcessingSpeech, setIsProcessingSpeech] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
 
@@ -107,7 +107,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
   // Speech-to-text functions
   const handleStartRecording = async () => {
     setRecordingError(null);
-    setAudioChunks([]);
+    audioChunksRef.current = [];
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -115,7 +115,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
       
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          setAudioChunks(prev => [...prev, event.data]);
+          audioChunksRef.current.push(event.data);
         }
       };
       
@@ -146,14 +146,12 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
   };
 
   const handleProcessRecording = async () => {
-  
-
-    if (audioChunks.length === 0) return;
+    if (audioChunksRef.current.length === 0) return;
     
     setIsProcessingSpeech(true);
     try {
       // Combine audio chunks into a single blob
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       
       // Send to speech-to-text service
       const result = await elevenLabsService.speechToText(audioBlob);
@@ -170,7 +168,7 @@ const AIRoleInput: React.FC<AIRoleInputProps> = ({
       console.error('Error processing recording:', error);
       setRecordingError('Error processing your speech. Please try again.');
     } finally {
-      setAudioChunks([]);
+      audioChunksRef.current = [];
       setIsProcessingSpeech(false);
     }
   };
