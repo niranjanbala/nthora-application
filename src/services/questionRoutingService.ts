@@ -251,13 +251,19 @@ export async function getAllQuestions(): Promise<Question[]> {
 }
 
 // Get demo questions
-export async function getDemoQuestions(): Promise<Question[]> {
+export async function getDemoQuestions(category?: string): Promise<Question[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('demo_questions')
       .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20);
+      .order('created_at', { ascending: false });
+      
+    // Filter by category if provided
+    if (category && category !== 'all') {
+      query = query.eq('category', category);
+    }
+      
+    const { data, error } = await query.limit(20);
 
     if (error) {
       console.error('Error fetching demo questions:', error);
@@ -324,6 +330,148 @@ export async function getRealQuestionCount(): Promise<number> {
   }
 }
 
+// Demo user IDs for consistent responders
+const DEMO_USERS = {
+  EXPERT_1: '11111111-1111-1111-1111-111111111111', // Senior expert
+  EXPERT_2: '22222222-2222-2222-2222-222222222222', // Mid-level expert
+  EXPERT_3: '33333333-3333-3333-3333-333333333333', // Junior expert
+  FIRST_DEGREE: '44444444-4444-4444-4444-444444444444', // 1st degree connection
+  SECOND_DEGREE: '55555555-5555-5555-5555-555555555555', // 2nd degree connection
+  THIRD_DEGREE: '66666666-6666-6666-6666-666666666666', // 3rd degree connection
+};
+
+// Demo response templates for different quality levels
+const DEMO_RESPONSES = {
+  HIGH_QUALITY: [
+    {
+      content: `# Comprehensive Analysis
+
+## Key Considerations
+1. **Strategic Alignment**: Ensure your approach aligns with your overall business strategy
+2. **Resource Allocation**: Carefully balance resources between immediate needs and long-term goals
+3. **Stakeholder Management**: Identify and engage all relevant stakeholders early
+
+## Recommended Approach
+- Start with a thorough assessment of your current state
+- Develop a phased implementation plan with clear milestones
+- Establish robust feedback mechanisms to enable continuous improvement
+
+## Common Pitfalls to Avoid
+- Underestimating the complexity of change management
+- Failing to secure executive sponsorship
+- Neglecting to communicate the "why" behind changes
+
+I've implemented similar initiatives at three Fortune 500 companies and would be happy to discuss specific aspects in more detail.`,
+      response_type: 'strategic',
+      helpful_votes: 15,
+      unhelpful_votes: 0,
+      quality_score: 0.95,
+      source_type: 'human',
+      network_degree: 1
+    },
+    {
+      content: `# Detailed Implementation Guide
+
+## Step 1: Assessment (Week 1-2)
+- Conduct stakeholder interviews to understand current pain points
+- Analyze existing processes and identify bottlenecks
+- Benchmark against industry standards to establish realistic targets
+
+## Step 2: Planning (Week 3-4)
+- Define clear success metrics aligned with business objectives
+- Create a detailed implementation roadmap with dependencies mapped
+- Develop a comprehensive risk management plan
+
+## Step 3: Execution (Week 5-12)
+- Begin with a pilot in a controlled environment
+- Implement changes in phases to minimize disruption
+- Collect continuous feedback and make iterative improvements
+
+## Step 4: Evaluation (Week 13-16)
+- Measure outcomes against predefined success metrics
+- Document lessons learned for future initiatives
+- Develop a sustainability plan for long-term success
+
+Based on my experience implementing this at companies ranging from startups to enterprises, the key success factor is maintaining clear communication throughout the process. I'm happy to provide more specific guidance on any particular aspect.`,
+      response_type: 'tactical',
+      helpful_votes: 12,
+      unhelpful_votes: 1,
+      quality_score: 0.92,
+      source_type: 'human',
+      network_degree: 1
+    }
+  ],
+  MEDIUM_QUALITY: [
+    {
+      content: `Here are some suggestions based on my experience:
+
+1. Start by identifying your key challenges
+2. Look for quick wins that can demonstrate value
+3. Build a roadmap for longer-term improvements
+4. Get buy-in from stakeholders
+
+You should also consider:
+- Available resources
+- Timeline constraints
+- Potential risks
+
+I implemented something similar last year and found that starting small and building momentum worked well. Let me know if you have specific questions about any part of this approach.`,
+      response_type: 'strategic',
+      helpful_votes: 7,
+      unhelpful_votes: 2,
+      quality_score: 0.65,
+      source_type: 'agentic_human',
+      quality_level: 'medium',
+      network_degree: 2
+    },
+    {
+      content: `Based on my experience, here's what I recommend:
+
+1. Analyze your current situation
+2. Set clear goals for what you want to achieve
+3. Develop an action plan with specific steps
+4. Implement changes gradually
+5. Measure results and adjust as needed
+
+Some tools that might help:
+- Project management software like Asana or Trello
+- Regular team check-ins
+- Feedback surveys
+
+I've seen this approach work well in similar situations. The key is to be flexible and willing to adapt as you learn more.`,
+      response_type: 'tactical',
+      helpful_votes: 5,
+      unhelpful_votes: 3,
+      quality_score: 0.6,
+      source_type: 'agentic_human',
+      quality_level: 'medium',
+      network_degree: 2
+    }
+  ],
+  LOW_QUALITY: [
+    {
+      content: `You should probably just try harder. Maybe read some books or articles about it. There are probably some good resources online. Good luck!`,
+      response_type: 'resource',
+      helpful_votes: 1,
+      unhelpful_votes: 8,
+      quality_score: 0.2,
+      source_type: 'agentic_human',
+      quality_level: 'low',
+      network_degree: 3
+    },
+    {
+      content: `I think you need to make a plan and then follow it. Also talk to people who know about this stuff. Maybe hire a consultant if you have budget.`,
+      response_type: 'strategic',
+      helpful_votes: 2,
+      unhelpful_votes: 6,
+      quality_score: 0.3,
+      source_type: 'agentic_human',
+      quality_level: 'low',
+      network_degree: 3
+    }
+  ]
+};
+
 // Seed demo questions if they don't exist
 export async function seedDemoQuestions(): Promise<{ success: boolean; error?: string }> {
   try {
@@ -333,8 +481,19 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
       .select('*', { count: 'exact', head: true });
 
     if (count && count > 0) {
-      return { success: true }; // Already seeded
+      // Check if we need to seed demo responses
+      const { count: responseCount } = await supabase
+        .from('question_responses')
+        .select('*', { count: 'exact', head: true })
+        .eq('question_id', await getFirstDemoQuestionId());
+        
+      if (responseCount && responseCount > 0) {
+        return { success: true }; // Already seeded with responses
+      }
     }
+
+    // First ensure demo user profiles exist
+    await seedDemoUserProfiles();
 
     // Sample demo questions to seed
     const demoQuestions = [
@@ -364,20 +523,285 @@ export async function seedDemoQuestions(): Promise<{ success: boolean; error?: s
         expected_answer_type: "strategic",
         urgency_level: "high",
         category: "fundraising"
+      },
+      {
+        title: "How to implement effective CI/CD for a growing engineering team?",
+        content: "Our team has grown from 3 to 15 engineers in the last year, and our deployment process is becoming a bottleneck. Looking for advice on implementing CI/CD that can scale with our team.",
+        primary_tags: ["engineering", "ci-cd", "devops"],
+        secondary_tags: ["automation", "productivity", "scaling"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "engineering"
+      },
+      {
+        title: "Strategies for reducing customer acquisition cost (CAC)?",
+        content: "Our CAC has been steadily increasing over the past 6 months. What strategies have worked for others to bring this down while maintaining growth?",
+        primary_tags: ["marketing", "cac", "growth"],
+        secondary_tags: ["metrics", "acquisition", "roi"],
+        expected_answer_type: "strategic",
+        urgency_level: "high",
+        category: "marketing"
+      },
+      {
+        title: "How to structure equity compensation for early employees?",
+        content: "We're a pre-seed startup about to make our first 5 hires. How should we think about equity allocation, vesting schedules, and communicating the value to candidates?",
+        primary_tags: ["equity", "compensation", "startup"],
+        secondary_tags: ["hiring", "retention", "vesting"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        category: "hr"
+      },
+      {
+        title: "Best approach for migrating from monolith to microservices?",
+        content: "We have a 5-year-old monolithic application that's becoming difficult to maintain and scale. What's the best approach to gradually migrate to a microservices architecture while keeping the business running?",
+        primary_tags: ["microservices", "architecture", "migration"],
+        secondary_tags: ["technical-debt", "scaling", "engineering"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "engineering"
+      },
+      {
+        title: "How to build a data-driven product culture?",
+        content: "Our product decisions are often based on intuition rather than data. How can we build a more data-driven product culture without slowing down our pace of innovation?",
+        primary_tags: ["product", "data", "culture"],
+        secondary_tags: ["analytics", "decision-making", "metrics"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        category: "product"
+      },
+      {
+        title: "Effective strategies for enterprise sales?",
+        content: "We're transitioning from SMB to enterprise customers. What are effective strategies for navigating longer sales cycles, multiple stakeholders, and enterprise requirements?",
+        primary_tags: ["sales", "enterprise", "b2b"],
+        secondary_tags: ["negotiation", "stakeholders", "contracts"],
+        expected_answer_type: "tactical",
+        urgency_level: "high",
+        category: "sales"
+      },
+      {
+        title: "How to implement OKRs effectively in a startup?",
+        content: "We're a 30-person startup and want to implement OKRs to better align our team. What are best practices for introducing OKRs without adding too much process overhead?",
+        primary_tags: ["okrs", "management", "goals"],
+        secondary_tags: ["alignment", "metrics", "performance"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        category: "management"
       }
     ];
 
-    const { error } = await supabase
-      .from('demo_questions')
-      .insert(demoQuestions);
+    // Insert or update demo questions
+    for (const question of demoQuestions) {
+      const { data, error } = await supabase
+        .from('demo_questions')
+        .upsert(question)
+        .select();
 
-    if (error) {
-      return { success: false, error: error.message };
+      if (error) {
+        console.error('Error upserting demo question:', error);
+        return { success: false, error: error.message };
+      }
+    }
+
+    // Get all demo question IDs
+    const { data: demoQuestionData, error: demoQuestionError } = await supabase
+      .from('demo_questions')
+      .select('id');
+
+    if (demoQuestionError || !demoQuestionData) {
+      console.error('Error fetching demo question IDs:', demoQuestionError);
+      return { success: false, error: demoQuestionError?.message || 'Failed to fetch demo question IDs' };
+    }
+
+    // Seed responses for each demo question
+    for (const question of demoQuestionData) {
+      await seedDemoResponses(question.id);
     }
 
     return { success: true };
   } catch (error) {
+    console.error('Error seeding demo questions:', error);
     return { success: false, error: 'Failed to seed demo questions' };
+  }
+}
+
+// Seed demo user profiles for responses
+async function seedDemoUserProfiles(): Promise<void> {
+  try {
+    // Define demo user profiles
+    const demoProfiles = [
+      {
+        id: DEMO_USERS.EXPERT_1,
+        email: 'expert1@example.com',
+        full_name: 'Dr. Sarah Chen',
+        bio: 'Senior Product Leader with 15+ years experience in SaaS and enterprise software. Previously VP Product at Salesforce and Director at Microsoft.',
+        expertise_areas: ['Product Strategy', 'SaaS', 'Enterprise Software', 'Leadership'],
+        role: 'member',
+        membership_status: 'active'
+      },
+      {
+        id: DEMO_USERS.EXPERT_2,
+        email: 'expert2@example.com',
+        full_name: 'Marcus Rodriguez',
+        bio: 'Engineering Manager specializing in scalable architecture and DevOps. 10 years experience building high-performance systems.',
+        expertise_areas: ['Engineering', 'DevOps', 'Architecture', 'Scaling'],
+        role: 'member',
+        membership_status: 'active'
+      },
+      {
+        id: DEMO_USERS.EXPERT_3,
+        email: 'expert3@example.com',
+        full_name: 'Jamie Taylor',
+        bio: 'Growth Marketing Specialist with experience at early-stage startups. Focus on customer acquisition and retention strategies.',
+        expertise_areas: ['Marketing', 'Growth', 'Customer Acquisition', 'Analytics'],
+        role: 'member',
+        membership_status: 'active'
+      },
+      {
+        id: DEMO_USERS.FIRST_DEGREE,
+        email: 'connection1@example.com',
+        full_name: 'Alex Morgan',
+        bio: 'First-degree connection with expertise in finance and operations.',
+        expertise_areas: ['Finance', 'Operations', 'Strategy'],
+        role: 'member',
+        membership_status: 'active'
+      },
+      {
+        id: DEMO_USERS.SECOND_DEGREE,
+        email: 'connection2@example.com',
+        full_name: 'Jordan Lee',
+        bio: 'Second-degree connection specializing in product design and UX research.',
+        expertise_areas: ['Design', 'UX Research', 'Product'],
+        role: 'member',
+        membership_status: 'active'
+      },
+      {
+        id: DEMO_USERS.THIRD_DEGREE,
+        email: 'connection3@example.com',
+        full_name: 'Taylor Smith',
+        bio: 'Third-degree connection with background in data science and AI.',
+        expertise_areas: ['Data Science', 'AI', 'Machine Learning'],
+        role: 'member',
+        membership_status: 'active'
+      }
+    ];
+
+    // Upsert each demo profile
+    for (const profile of demoProfiles) {
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert(profile, { onConflict: 'id' });
+
+      if (error) {
+        console.error(`Error upserting demo profile ${profile.full_name}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Error seeding demo user profiles:', error);
+  }
+}
+
+// Get first demo question ID for checking if responses exist
+async function getFirstDemoQuestionId(): Promise<string> {
+  const { data } = await supabase
+    .from('demo_questions')
+    .select('id')
+    .limit(1)
+    .single();
+    
+  return data?.id || '';
+}
+
+// Seed demo responses for a question
+async function seedDemoResponses(questionId: string): Promise<void> {
+  try {
+    // Check if responses already exist for this question
+    const { count } = await supabase
+      .from('question_responses')
+      .select('*', { count: 'exact', head: true })
+      .eq('question_id', questionId);
+      
+    if (count && count > 0) {
+      return; // Responses already exist
+    }
+    
+    // Create a mix of responses for this question
+    const responses = [
+      // High quality human response from 1st degree connection
+      {
+        question_id: questionId,
+        responder_id: DEMO_USERS.EXPERT_1,
+        content: DEMO_RESPONSES.HIGH_QUALITY[0].content,
+        response_type: DEMO_RESPONSES.HIGH_QUALITY[0].response_type,
+        helpful_votes: DEMO_RESPONSES.HIGH_QUALITY[0].helpful_votes,
+        unhelpful_votes: DEMO_RESPONSES.HIGH_QUALITY[0].unhelpful_votes,
+        quality_score: DEMO_RESPONSES.HIGH_QUALITY[0].quality_score,
+        source_type: DEMO_RESPONSES.HIGH_QUALITY[0].source_type,
+        created_at: new Date(Date.now() - 3600000 * 24).toISOString(), // 1 day ago
+        updated_at: new Date(Date.now() - 3600000 * 24).toISOString()
+      },
+      
+      // Another high quality human response from 1st degree connection
+      {
+        question_id: questionId,
+        responder_id: DEMO_USERS.FIRST_DEGREE,
+        content: DEMO_RESPONSES.HIGH_QUALITY[1].content,
+        response_type: DEMO_RESPONSES.HIGH_QUALITY[1].response_type,
+        helpful_votes: DEMO_RESPONSES.HIGH_QUALITY[1].helpful_votes,
+        unhelpful_votes: DEMO_RESPONSES.HIGH_QUALITY[1].unhelpful_votes,
+        quality_score: DEMO_RESPONSES.HIGH_QUALITY[1].quality_score,
+        source_type: DEMO_RESPONSES.HIGH_QUALITY[1].source_type,
+        created_at: new Date(Date.now() - 3600000 * 12).toISOString(), // 12 hours ago
+        updated_at: new Date(Date.now() - 3600000 * 12).toISOString()
+      },
+      
+      // Medium quality AI response from 2nd degree connection
+      {
+        question_id: questionId,
+        responder_id: DEMO_USERS.SECOND_DEGREE,
+        content: DEMO_RESPONSES.MEDIUM_QUALITY[0].content,
+        response_type: DEMO_RESPONSES.MEDIUM_QUALITY[0].response_type,
+        helpful_votes: DEMO_RESPONSES.MEDIUM_QUALITY[0].helpful_votes,
+        unhelpful_votes: DEMO_RESPONSES.MEDIUM_QUALITY[0].unhelpful_votes,
+        quality_score: DEMO_RESPONSES.MEDIUM_QUALITY[0].quality_score,
+        source_type: DEMO_RESPONSES.MEDIUM_QUALITY[0].source_type,
+        quality_level: DEMO_RESPONSES.MEDIUM_QUALITY[0].quality_level,
+        created_at: new Date(Date.now() - 3600000 * 6).toISOString(), // 6 hours ago
+        updated_at: new Date(Date.now() - 3600000 * 6).toISOString()
+      },
+      
+      // Low quality AI response from 3rd degree connection
+      {
+        question_id: questionId,
+        responder_id: DEMO_USERS.THIRD_DEGREE,
+        content: DEMO_RESPONSES.LOW_QUALITY[0].content,
+        response_type: DEMO_RESPONSES.LOW_QUALITY[0].response_type,
+        helpful_votes: DEMO_RESPONSES.LOW_QUALITY[0].helpful_votes,
+        unhelpful_votes: DEMO_RESPONSES.LOW_QUALITY[0].unhelpful_votes,
+        quality_score: DEMO_RESPONSES.LOW_QUALITY[0].quality_score,
+        source_type: DEMO_RESPONSES.LOW_QUALITY[0].source_type,
+        quality_level: DEMO_RESPONSES.LOW_QUALITY[0].quality_level,
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(), // 2 hours ago
+        updated_at: new Date(Date.now() - 3600000 * 2).toISOString()
+      }
+    ];
+    
+    // Insert all responses
+    const { error } = await supabase
+      .from('question_responses')
+      .insert(responses);
+      
+    if (error) {
+      console.error('Error inserting demo responses:', error);
+    }
+    
+    // Update response count on the demo question
+    await supabase
+      .from('demo_questions')
+      .update({ response_count: responses.length })
+      .eq('id', questionId);
+      
+  } catch (error) {
+    console.error('Error seeding demo responses:', error);
   }
 }
 
@@ -501,14 +925,32 @@ export async function respondToQuestion(
       return { success: false, error: error.message };
     }
 
-    // Update question response count
-    await supabase
-      .from('questions')
-      .update({ 
-        response_count: supabase.sql`response_count + 1`,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', questionId);
+    // Check if this is a demo question
+    const { data: demoQuestion } = await supabase
+      .from('demo_questions')
+      .select('id')
+      .eq('id', questionId)
+      .maybeSingle();
+      
+    if (demoQuestion) {
+      // Update response count for demo question
+      await supabase
+        .from('demo_questions')
+        .update({ 
+          response_count: supabase.sql`response_count + 1`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', questionId);
+    } else {
+      // Update response count for regular question
+      await supabase
+        .from('questions')
+        .update({ 
+          response_count: supabase.sql`response_count + 1`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', questionId);
+    }
 
     return { success: true, response_id: data.id };
   } catch (error) {
