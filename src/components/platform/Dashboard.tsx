@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User, LogOut, Compass } from 'lucide-react';
+import { MessageSquare, Users, Star, Settings, Plus, Bell, Search, Menu, X, Sparkle, Zap, ArrowRight, Trophy, User, LogOut, Compass, ToggleLeft, ToggleRight } from 'lucide-react';
 import QuestionComposer from '../questions/QuestionComposer';
 import QuestionFeed from '../questions/QuestionFeed';
 import ExpertiseManager from '../questions/ExpertiseManager';
@@ -44,6 +44,7 @@ const Dashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState<DashboardView>('feed');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const navigate = useNavigate();
 
   // Handle URL-based view changes
@@ -67,6 +68,10 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const toggleDemoMode = () => {
+    setIsDemoMode(!isDemoMode);
+  };
+
   const navigationItems = [
     { id: 'feed', label: 'Feed', icon: MessageSquare, badge: null, description: 'Latest questions and activity' },
     { id: 'explore_topics', label: 'Explore Topics', icon: Compass, badge: null, description: 'Questions in your areas of interest' },
@@ -88,15 +93,15 @@ const Dashboard: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'feed':
-        return <QuestionFeed view="all" />;
+        return <QuestionFeed view="all" isDemoMode={isDemoMode} />;
       case 'explore_topics':
-        return <QuestionFeed view="explore_topics" />;
+        return <QuestionFeed view="explore_topics" isDemoMode={isDemoMode} />;
       case 'ask_question':
         return <QuestionComposer onQuestionCreated={() => handleViewChange('my_questions')} />;
       case 'my_questions':
-        return <QuestionFeed view="my_questions" />;
+        return <QuestionFeed view="my_questions" isDemoMode={isDemoMode} />;
       case 'matched_questions':
-        return <QuestionFeed view="matched_questions" />;
+        return <QuestionFeed view="matched_questions" isDemoMode={isDemoMode} />;
       case 'expertise':
         return <ExpertiseManager />;
       case 'auto_skills':
@@ -122,7 +127,7 @@ const Dashboard: React.FC = () => {
       case 'preferences':
         return <PreferencesPage />;
       default:
-        return <QuestionFeed view="all" />;
+        return <QuestionFeed view="all" isDemoMode={isDemoMode} />;
     }
   };
 
@@ -204,6 +209,28 @@ const Dashboard: React.FC = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Demo Mode Toggle */}
+              <button
+                onClick={toggleDemoMode}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors duration-300 ${
+                  isDemoMode 
+                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {isDemoMode ? (
+                  <>
+                    <ToggleRight className="h-5 w-5" />
+                    <span className="text-sm font-medium">Demo Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <ToggleLeft className="h-5 w-5" />
+                    <span className="text-sm font-medium">Demo Mode</span>
+                  </>
+                )}
+              </button>
+              
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-surface-400" />
                 <input
@@ -282,6 +309,26 @@ const Dashboard: React.FC = () => {
                       <X className="h-5 w-5" />
                     </button>
                   </div>
+                </div>
+
+                {/* Demo Mode Toggle (Mobile) */}
+                <div className="px-4 py-3 border-b border-gray-200">
+                  <button
+                    onClick={toggleDemoMode}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors duration-300 ${
+                      isDemoMode 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      {isDemoMode ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+                      <span className="font-medium">Demo Mode</span>
+                    </div>
+                    <span className="text-xs">
+                      {isDemoMode ? 'On' : 'Off'}
+                    </span>
+                  </button>
                 </div>
 
                 {/* Navigation Items */}

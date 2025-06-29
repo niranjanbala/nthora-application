@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, MessageSquare, Tag, AlertTriangle, Lock, Plus, ArrowRight } from 'lucide-react';
+import { Clock, Users, MessageSquare, Tag, AlertTriangle, Lock, Plus, ArrowRight, ToggleLeft, ToggleRight } from 'lucide-react';
 import { 
   getUserQuestions, 
   getMatchedQuestions, 
@@ -12,39 +12,343 @@ import {
 
 interface QuestionFeedProps {
   view: 'my_questions' | 'matched_questions' | 'all' | 'explore_topics';
+  isDemoMode?: boolean;
 }
 
-const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
+const QuestionFeed: React.FC<QuestionFeedProps> = ({ 
+  view,
+  isDemoMode = false
+}) => {
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [localDemoMode, setLocalDemoMode] = useState(isDemoMode);
+
+  useEffect(() => {
+    setLocalDemoMode(isDemoMode);
+  }, [isDemoMode]);
 
   useEffect(() => {
     loadQuestions();
-  }, [view]);
+  }, [view, localDemoMode]);
 
   const loadQuestions = async () => {
     setLoading(true);
     try {
-      let data: Question[] = [];
-      
-      if (view === 'matched_questions') {
-        const matchedQuestions = await getMatchedQuestions();
-        data = matchedQuestions;
-      } else if (view === 'my_questions') {
-        data = await getUserQuestions();
-      } else if (view === 'explore_topics') {
-        data = await getExploreTopicsQuestions();
+      if (localDemoMode) {
+        // Load demo questions
+        const demoQuestions = generateMockQuestions(view);
+        setQuestions(demoQuestions);
       } else {
-        data = await getAllQuestions();
+        // Load real questions
+        let data: Question[] = [];
+        
+        if (view === 'matched_questions') {
+          const matchedQuestions = await getMatchedQuestions();
+          data = matchedQuestions;
+        } else if (view === 'my_questions') {
+          data = await getUserQuestions();
+        } else if (view === 'explore_topics') {
+          data = await getExploreTopicsQuestions();
+        } else {
+          data = await getAllQuestions();
+        }
+        
+        setQuestions(data);
       }
-      
-      setQuestions(data);
     } catch (error) {
       console.error('Error loading questions:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const generateMockQuestions = (viewType: string): Question[] => {
+    // Base set of mock questions
+    const baseQuestions: Partial<Question>[] = [
+      {
+        title: "How to implement a scalable microservice architecture?",
+        content: "I'm working on a project that's growing rapidly and we need to move from our monolith to microservices. What's the best approach to ensure scalability while minimizing disruption?",
+        primary_tags: ["Microservices", "Architecture", "Scalability"],
+        secondary_tags: ["DevOps", "Cloud"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 42,
+        response_count: 3,
+        helpful_votes: 5,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree"
+      },
+      {
+        title: "Best practices for React performance optimization?",
+        content: "Our React application is getting slower as we add more features. What are the current best practices for optimizing React performance in 2025? Specifically looking at state management, rendering optimization, and code splitting strategies.",
+        primary_tags: ["React", "Performance", "Frontend"],
+        secondary_tags: ["JavaScript", "Optimization"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 38,
+        response_count: 5,
+        helpful_votes: 12,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree"
+      },
+      {
+        title: "Fundraising strategies for AI startups in the current market",
+        content: "We're an early-stage AI startup focused on healthcare applications. Given the current market conditions, what fundraising strategies would you recommend? Looking for advice on valuation expectations, investor targeting, and pitch deck focus areas.",
+        primary_tags: ["Fundraising", "AI", "Startups"],
+        secondary_tags: ["Healthcare", "Venture Capital"],
+        expected_answer_type: "strategic",
+        urgency_level: "high",
+        status: "active",
+        view_count: 65,
+        response_count: 7,
+        helpful_votes: 18,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree"
+      },
+      {
+        title: "How to build an effective data science team?",
+        content: "I'm tasked with building out our data science capabilities from scratch. What roles should I prioritize hiring for? How should I structure the team? Any advice on interview processes for data scientists?",
+        primary_tags: ["Data Science", "Team Building", "Hiring"],
+        secondary_tags: ["Leadership", "ML"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 29,
+        response_count: 4,
+        helpful_votes: 8,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree"
+      },
+      {
+        title: "Implementing zero-trust security in a hybrid cloud environment",
+        content: "We're moving to a hybrid cloud setup and want to implement zero-trust security principles. What are the key components we should focus on? Any specific tools or frameworks you'd recommend?",
+        primary_tags: ["Security", "Zero Trust", "Cloud"],
+        secondary_tags: ["DevSecOps", "Compliance"],
+        expected_answer_type: "tactical",
+        urgency_level: "high",
+        status: "active",
+        view_count: 47,
+        response_count: 6,
+        helpful_votes: 15,
+        is_anonymous: false,
+        is_sensitive: true,
+        visibility_level: "first_degree"
+      },
+      {
+        title: "Product-led growth strategies for B2B SaaS",
+        content: "We're pivoting our B2B SaaS from a traditional sales-led approach to product-led growth. What are the key metrics we should track? How should we adjust our onboarding and pricing? Any success stories or cautionary tales would be appreciated.",
+        primary_tags: ["Product-Led Growth", "SaaS", "B2B"],
+        secondary_tags: ["Marketing", "Onboarding"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 53,
+        response_count: 8,
+        helpful_votes: 21,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree"
+      },
+      {
+        title: "Implementing CI/CD for machine learning models",
+        content: "We're struggling with our ML model deployment pipeline. How can we implement CI/CD practices specifically for ML models? Looking for tools, frameworks, and best practices.",
+        primary_tags: ["MLOps", "CI/CD", "Machine Learning"],
+        secondary_tags: ["DevOps", "Automation"],
+        expected_answer_type: "tactical",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 31,
+        response_count: 4,
+        helpful_votes: 9,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree"
+      },
+      {
+        title: "Strategies for reducing AWS costs without sacrificing performance",
+        content: "Our AWS bill has been steadily increasing. What strategies have worked for you to optimize costs while maintaining performance? Particularly interested in EC2, RDS, and data transfer optimizations.",
+        primary_tags: ["AWS", "Cost Optimization", "Cloud"],
+        secondary_tags: ["Infrastructure", "FinOps"],
+        expected_answer_type: "tactical",
+        urgency_level: "high",
+        status: "active",
+        view_count: 72,
+        response_count: 9,
+        helpful_votes: 24,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree"
+      },
+      {
+        title: "Building an effective remote engineering culture",
+        content: "Our engineering team has gone fully remote, and we're struggling with collaboration and maintaining culture. What practices have worked well for building strong remote engineering cultures? How do you handle onboarding, knowledge sharing, and team bonding?",
+        primary_tags: ["Remote Work", "Engineering Culture", "Team Management"],
+        secondary_tags: ["Collaboration", "Onboarding"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 58,
+        response_count: 7,
+        helpful_votes: 19,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "second_degree"
+      },
+      {
+        title: "Implementing ethical AI guidelines in product development",
+        content: "We're developing AI-powered features and want to ensure we're following ethical guidelines. What frameworks or processes have you used to implement ethical AI practices in product development?",
+        primary_tags: ["AI Ethics", "Product Development", "Guidelines"],
+        secondary_tags: ["Compliance", "Responsible AI"],
+        expected_answer_type: "strategic",
+        urgency_level: "medium",
+        status: "active",
+        view_count: 41,
+        response_count: 5,
+        helpful_votes: 13,
+        is_anonymous: false,
+        is_sensitive: false,
+        visibility_level: "first_degree"
+      }
+    ];
+    
+    // Add more view-specific questions
+    if (viewType === 'matched_questions') {
+      baseQuestions.push(
+        {
+          title: "Optimizing PostgreSQL for high-write applications",
+          content: "We're building an IoT platform that needs to handle thousands of writes per second to PostgreSQL. What optimizations should we consider for this high-write scenario?",
+          primary_tags: ["PostgreSQL", "Database", "Performance"],
+          secondary_tags: ["IoT", "Scaling"],
+          expected_answer_type: "tactical",
+          urgency_level: "high",
+          status: "active",
+          view_count: 37,
+          response_count: 3,
+          helpful_votes: 8,
+          is_anonymous: false,
+          is_sensitive: false,
+          visibility_level: "first_degree"
+        },
+        {
+          title: "Implementing a design system at scale",
+          content: "We're a growing company with multiple product teams and need to implement a cohesive design system. What's the best approach to create, document, and ensure adoption of a design system across teams?",
+          primary_tags: ["Design Systems", "UX/UI", "Frontend"],
+          secondary_tags: ["Collaboration", "Documentation"],
+          expected_answer_type: "strategic",
+          urgency_level: "medium",
+          status: "active",
+          view_count: 45,
+          response_count: 6,
+          helpful_votes: 17,
+          is_anonymous: false,
+          is_sensitive: false,
+          visibility_level: "second_degree"
+        }
+      );
+    } else if (viewType === 'my_questions') {
+      baseQuestions.push(
+        {
+          title: "Best approach for transitioning from monolith to microservices?",
+          content: "Our team is considering breaking up our monolithic application into microservices. What strategies have worked well for making this transition while keeping the application running?",
+          primary_tags: ["Microservices", "Architecture", "Migration"],
+          secondary_tags: ["DevOps", "Refactoring"],
+          expected_answer_type: "strategic",
+          urgency_level: "medium",
+          status: "active",
+          view_count: 52,
+          response_count: 7,
+          helpful_votes: 15,
+          is_anonymous: false,
+          is_sensitive: false,
+          visibility_level: "first_degree"
+        },
+        {
+          title: "Effective strategies for technical debt management",
+          content: "Our codebase has accumulated significant technical debt over the years. What approaches have worked for you to systematically address tech debt while still delivering new features?",
+          primary_tags: ["Technical Debt", "Code Quality", "Engineering"],
+          secondary_tags: ["Refactoring", "Process"],
+          expected_answer_type: "strategic",
+          urgency_level: "medium",
+          status: "answered",
+          view_count: 63,
+          response_count: 8,
+          helpful_votes: 22,
+          is_anonymous: false,
+          is_sensitive: false,
+          visibility_level: "first_degree"
+        }
+      );
+    } else if (viewType === 'explore_topics') {
+      baseQuestions.push(
+        {
+          title: "Implementing a zero-knowledge proof system for identity verification",
+          content: "We're building a privacy-focused identity verification system and want to implement zero-knowledge proofs. What libraries or approaches would you recommend for a production system?",
+          primary_tags: ["Zero-Knowledge Proofs", "Cryptography", "Identity"],
+          secondary_tags: ["Privacy", "Security"],
+          expected_answer_type: "tactical",
+          urgency_level: "medium",
+          status: "active",
+          view_count: 39,
+          response_count: 4,
+          helpful_votes: 11,
+          is_anonymous: false,
+          is_sensitive: false,
+          visibility_level: "second_degree"
+        },
+        {
+          title: "Strategies for reducing ML model latency in production",
+          content: "Our ML models are taking too long to generate predictions in production. What techniques have you used to reduce inference latency while maintaining accuracy?",
+          primary_tags: ["Machine Learning", "Performance", "MLOps"],
+          secondary_tags: ["Optimization", "Production"],
+          expected_answer_type: "tactical",
+          urgency_level: "high",
+          status: "active",
+          view_count: 47,
+          response_count: 6,
+          helpful_votes: 14,
+          is_anonymous: false,
+          is_sensitive: false,
+          visibility_level: "first_degree"
+        }
+      );
+    }
+
+    // Convert partial questions to full questions with IDs and timestamps
+    return baseQuestions.map((q, index) => {
+      const now = new Date();
+      const createdAt = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000); // Random time in the last week
+      const updatedAt = new Date(createdAt.getTime() + Math.random() * 24 * 60 * 60 * 1000); // Random time after creation
+      const expiresAt = new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days after creation
+      
+      return {
+        id: `demo-${view}-${index}`,
+        asker_id: 'demo-user',
+        title: q.title || 'Demo Question',
+        content: q.content || 'This is a demo question content.',
+        primary_tags: q.primary_tags || [],
+        secondary_tags: q.secondary_tags || [],
+        expected_answer_type: q.expected_answer_type || 'tactical',
+        urgency_level: q.urgency_level || 'medium',
+        ai_summary: `This is a question about ${q.primary_tags?.[0] || 'a topic'}.`,
+        visibility_level: q.visibility_level || 'first_degree',
+        is_anonymous: q.is_anonymous || false,
+        is_sensitive: q.is_sensitive || false,
+        status: q.status || 'active',
+        view_count: q.view_count || Math.floor(Math.random() * 100),
+        response_count: q.response_count || Math.floor(Math.random() * 10),
+        helpful_votes: q.helpful_votes || Math.floor(Math.random() * 20),
+        created_at: createdAt.toISOString(),
+        updated_at: updatedAt.toISOString(),
+        expires_at: expiresAt.toISOString()
+      } as Question;
+    });
   };
 
   const handleQuestionClick = (questionId: string) => {
@@ -213,10 +517,51 @@ const QuestionFeed: React.FC<QuestionFeedProps> = ({ view }) => {
           <h2 className="text-2xl font-medium text-ink-dark">{getViewTitle()}</h2>
           <p className="text-ink-light">{getViewDescription()}</p>
         </div>
-        <div className="text-sm text-ink-light">
-          {questions.length} question{questions.length !== 1 ? 's' : ''}
+        <div className="flex items-center space-x-4">
+          <div className="text-sm text-ink-light">
+            {questions.length} question{questions.length !== 1 ? 's' : ''}
+          </div>
+          
+          {/* Demo Mode Toggle */}
+          <button
+            onClick={() => setLocalDemoMode(!localDemoMode)}
+            className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors duration-300 ${
+              localDemoMode 
+                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {localDemoMode ? (
+              <>
+                <ToggleRight className="h-4 w-4" />
+                <span className="text-sm font-medium">Demo Mode</span>
+              </>
+            ) : (
+              <>
+                <ToggleLeft className="h-4 w-4" />
+                <span className="text-sm font-medium">Demo Mode</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Demo Mode Banner */}
+      {localDemoMode && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+              <ToggleRight className="h-4 w-4 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="font-medium text-purple-900">Demo Mode Active</h3>
+              <p className="text-sm text-purple-700">
+                You're viewing simulated questions. Toggle demo mode off to see real content.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Questions List */}
       <motion.div 
