@@ -124,7 +124,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     };
   }, [currentAudio]);
 
-  // Auto-play audio when entering step 2 (currentStep = 1)
+  // Auto-play audio when entering step 2 (currentStep = 1) or step 3 (currentStep = 2)
   useEffect(() => {
     if (currentStep === 1) {
       // Small delay to ensure UI is rendered
@@ -138,6 +138,16 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           industries: []
         });
         startProgressiveAudio();
+      }, 500);
+      return () => clearTimeout(timer);
+    } else if (currentStep === 2) {
+      // Step 3 - Expertise step
+      const timer = setTimeout(() => {
+        setPreviousData({ 
+          ...data,
+          expertiseAreas: [] // Reset to ensure we can detect any input
+        });
+        startProgressiveAudioStep3();
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -164,37 +174,47 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       return;
     }
 
-    const currentStep = audioStep;
     let shouldContinue = false;
 
-    // Check if relevant field has been filled based on current audio step
-    switch (currentStep) {
-      case 1: // Full Name
-        const hasContent = data.fullName.trim() !== '';
-        const isDifferent = data.fullName.trim() !== previousData.fullName.trim();
-        shouldContinue = hasContent && isDifferent;
-        console.log('🔤 Checking fullName:', { 
-          current: `"${data.fullName}"`, 
-          previous: `"${previousData.fullName}"`, 
-          hasContent,
-          isDifferent,
-          shouldContinue 
-        });
-        break;
-      case 2: // Role
-        shouldContinue = data.primaryRole.trim() !== '' && data.primaryRole !== previousData.primaryRole;
-        console.log('💼 Checking role:', { current: data.primaryRole, previous: previousData.primaryRole, shouldContinue });
-        break;
-      case 3: // Additional roles - continue after any interaction or timeout (not mandatory)
-        // Continue if user added a role or after 5 seconds timeout
-        const timeSinceWaiting = Date.now() - (previousData.timestamp || 0);
-        shouldContinue = data.additionalRoles.length !== previousData.additionalRoles.length || timeSinceWaiting > 5000;
-        console.log('➕ Checking additional roles:', { currentLength: data.additionalRoles.length, previousLength: previousData.additionalRoles.length, timeSinceWaiting, shouldContinue });
-        break;
-      case 4: // Industry
-        shouldContinue = data.industries.length > 0 && data.industries.length !== previousData.industries.length;
-        console.log('🏢 Checking industries:', { currentLength: data.industries.length, previousLength: previousData.industries.length, shouldContinue });
-        break;
+    // Check if relevant field has been filled based on current onboarding step and audio step
+    if (currentStep === 1) {
+      // Step 2 progressive audio logic
+      switch (audioStep) {
+        case 1: // Full Name
+          const hasContent = data.fullName.trim() !== '';
+          const isDifferent = data.fullName.trim() !== previousData.fullName.trim();
+          shouldContinue = hasContent && isDifferent;
+          console.log('🔤 Checking fullName:', { 
+            current: `"${data.fullName}"`, 
+            previous: `"${previousData.fullName}"`, 
+            hasContent,
+            isDifferent,
+            shouldContinue 
+          });
+          break;
+        case 2: // Role
+          shouldContinue = data.primaryRole.trim() !== '' && data.primaryRole !== previousData.primaryRole;
+          console.log('💼 Checking role:', { current: data.primaryRole, previous: previousData.primaryRole, shouldContinue });
+          break;
+        case 3: // Additional roles - continue after any interaction or timeout (not mandatory)
+          // Continue if user added a role or after 5 seconds timeout
+          const timeSinceWaiting = Date.now() - (previousData.timestamp || 0);
+          shouldContinue = data.additionalRoles.length !== previousData.additionalRoles.length || timeSinceWaiting > 5000;
+          console.log('➕ Checking additional roles:', { currentLength: data.additionalRoles.length, previousLength: previousData.additionalRoles.length, timeSinceWaiting, shouldContinue });
+          break;
+        case 4: // Industry
+          shouldContinue = data.industries.length > 0 && data.industries.length !== previousData.industries.length;
+          console.log('🏢 Checking industries:', { currentLength: data.industries.length, previousLength: previousData.industries.length, shouldContinue });
+          break;
+      }
+    } else if (currentStep === 2) {
+      // Step 3 progressive audio logic
+      switch (audioStep) {
+        case 1: // Expertise Areas
+          shouldContinue = data.expertiseAreas.length > 0 && data.expertiseAreas.length !== previousData.expertiseAreas.length;
+          console.log('🎯 Checking expertiseAreas:', { currentLength: data.expertiseAreas.length, previousLength: previousData.expertiseAreas.length, shouldContinue });
+          break;
+      }
     }
 
     if (shouldContinue) {
@@ -210,10 +230,12 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       // Debounce: Wait 2 seconds before continuing to next step
       progressTimerRef.current = setTimeout(() => {
         console.log('⏰ Timer triggered, continuing to next audio step:', audioStep + 1);
-        if (audioStep < 4) {
+        const maxSteps = currentStep === 1 ? 4 : currentStep === 2 ? 1 : 0; // Step 2 has 5 steps (0-4), Step 3 has 2 steps (0-1)
+        if (audioStep < maxSteps) {
           setAudioStep(audioStep + 1);
           playProgressiveAudio(audioStep + 1);
         } else {
+          console.log('✅ Progressive audio completed for step', currentStep + 1);
           setIsProgressiveAudio(false);
         }
         progressTimerRef.current = null;
@@ -223,7 +245,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     }
 
     // No cleanup needed since we're managing the timer manually
-  }, [data.fullName, data.primaryRole, data.additionalRoles.length, data.industries.length, isProgressiveAudio, waitingForInput, audioStep, previousData]);
+  }, [data.fullName, data.primaryRole, data.additionalRoles.length, data.industries.length, data.expertiseAreas.length, isProgressiveAudio, waitingForInput, audioStep, previousData]);
 
   const motivations = [
     { id: 'give_help', label: 'Give Help', icon: '🤝', description: 'Share my expertise with others' },
@@ -344,31 +366,109 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
   // Focus input field by id
   const focusInput = (inputId: string) => {
-    setTimeout(() => {
-      const input = document.getElementById(inputId);
-      if (input) {
-        input.focus();
-        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
+    console.log('🎯 Attempting to focus input:', inputId);
+    
+    // Try multiple times with increasing delays to ensure element is rendered
+    const attemptFocus = (attempt: number) => {
+      const timeout = attempt * 200; // 200ms, 400ms, 600ms, 800ms
+      
+      setTimeout(() => {
+        console.log(`🔄 Focus attempt ${attempt + 1} for:`, inputId);
+        
+        // Try getElementById first
+        let input = document.getElementById(inputId);
+        
+        // If not found, try different selectors
+        if (!input) {
+          console.log('❌ getElementById failed, trying alternatives...');
+          input = document.querySelector(`#${inputId}`) as HTMLElement;
+          
+          if (!input) {
+            input = document.querySelector(`textarea#${inputId}`) as HTMLElement;
+          }
+          
+          if (!input) {
+            input = document.querySelector(`input#${inputId}`) as HTMLElement;
+          }
+          
+          if (!input) {
+            // Try finding any focusable element in the expertise input area
+            input = document.querySelector('textarea[placeholder*="expertise"]') as HTMLElement;
+          }
+        }
+        
+        console.log(`🔍 Attempt ${attempt + 1} - Element found:`, input ? 'Yes' : 'No', input);
+        
+        if (input) {
+          try {
+            // Ensure element is visible and not disabled
+            const isVisible = input.offsetParent !== null;
+            const isDisabled = input.hasAttribute('disabled');
+            
+            console.log('📊 Element state:', { visible: isVisible, disabled: isDisabled });
+            
+            if (isVisible && !isDisabled) {
+              input.focus();
+              input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              
+              // Verify focus was successful
+              const isFocused = document.activeElement === input;
+              console.log(`✅ Focus attempt ${attempt + 1} result:`, isFocused ? 'SUCCESS' : 'FAILED');
+              
+              if (isFocused) {
+                return; // Success, stop trying
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error in focus attempt ${attempt + 1}:`, error);
+          }
+        }
+        
+        // If this wasn't the last attempt, don't try again
+        if (attempt < 3) {
+          console.log(`🔄 Will retry focus in ${(attempt + 1) * 200}ms...`);
+        } else {
+          console.error('💥 All focus attempts failed for:', inputId);
+        }
+      }, timeout);
+    };
+    
+    // Try 4 times with increasing delays
+    for (let i = 0; i < 4; i++) {
+      attemptFocus(i);
+    }
   };
 
   // Get progressive audio content for step 2
   const getProgressiveAudioContent = (step: number) => {
-    switch (step) {
-      case 0:
-        return "Tell us about yourself. This helps us personalize your experience and suggest relevant connections.";
-      case 1:
-        return "Please input First Name.";
-      case 2:
-        return "Now, please describe your current role. What do you do professionally?";
-      case 3:
-        return "You can also add any additional roles you've held to showcase your diverse experience.";
-      case 4:
-        return "Finally, please describe your industry or field of work.";
-      default:
-        return "";
+    if (currentStep === 1) {
+      // Step 2 content
+      switch (step) {
+        case 0:
+          return "Tell us about yourself. This helps us personalize your experience and suggest relevant connections.";
+        case 1:
+          return "Please input First Name.";
+        case 2:
+          return "Now, please describe your current role. What do you do professionally?";
+        case 3:
+          return "You can also add any additional roles you've held to showcase your diverse experience.";
+        case 4:
+          return "Finally, please describe your industry or field of work.";
+        default:
+          return "";
+      }
+    } else if (currentStep === 2) {
+      // Step 3 content - Expertise
+      switch (step) {
+        case 0:
+          return "Now let's talk about your expertise. This helps us understand what you can help others with and builds your credibility on the platform.";
+        case 1:
+          return "Please describe your expertise areas. Be specific about your skills, experience, and knowledge areas.";
+        default:
+          return "";
+      }
     }
+    return "";
   };
 
   // Start progressive audio playback for step 2
@@ -379,6 +479,17 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     setIsProgressiveAudio(true);
     setAudioStep(0);
     console.log('Playing audio step 0');
+    await playProgressiveAudio(0);
+  };
+
+  // Start progressive audio playback for step 3
+  const startProgressiveAudioStep3 = async () => {
+    console.log('Starting progressive audio for step 3:', currentStep);
+    if (currentStep !== 2) return;
+    
+    setIsProgressiveAudio(true);
+    setAudioStep(0);
+    console.log('Playing audio step 0 for expertise');
     await playProgressiveAudio(0);
   };
 
@@ -417,38 +528,45 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         setIsPlayingAudio(false);
         
         // Focus appropriate input after audio ends and wait for user input
-        if (step === 1) {
-          console.log('🎯 Step 1 ended - Focusing fullName input and waiting for input');
-          focusInput('fullName');
-          setWaitingForInput(true);
-          console.log('🔧 State should now be: waitingForInput=true, isProgressiveAudio=true');
-        } else if (step === 2) {
-          console.log('🎯 Step 2 ended - Focusing roleInput');
-          focusInput('roleInput');
-          setWaitingForInput(true);
-        } else if (step === 3) {
-          console.log('🎯 Step 3 ended - Focusing additionalRole input');
-          focusInput('additionalRole');
-          setWaitingForInput(true);
-          // Set timestamp for step 3 timeout
-          setPreviousData(prev => prev ? { ...prev, timestamp: Date.now() } : null);
-        } else if (step === 4) {
-          console.log('🎯 Step 4 ended - Focusing industryInput');
-          focusInput('industryInput');
-          setWaitingForInput(true);
-        } else {
-          // For step 0 (intro), continue automatically
-          if (step === 0) {
-            console.log('🎯 Step 0 ended, continuing to step 1 in 1 second');
-            setTimeout(() => {
-              console.log('⏰ Timeout triggered, continuing to step 1');
-              setAudioStep(1);
-              playProgressiveAudio(1);
-            }, 1000);
-          } else {
-            console.log('✅ Progressive audio completed');
-            setIsProgressiveAudio(false);
+        if (currentStep === 1) {
+          // Step 2 progressive audio focus logic
+          if (step === 1) {
+            console.log('🎯 Step 1 ended - Focusing fullName input and waiting for input');
+            focusInput('fullName');
+            setWaitingForInput(true);
+            console.log('🔧 State should now be: waitingForInput=true, isProgressiveAudio=true');
+          } else if (step === 2) {
+            console.log('🎯 Step 2 ended - Focusing roleInput');
+            focusInput('roleInput');
+            setWaitingForInput(true);
+          } else if (step === 3) {
+            console.log('🎯 Step 3 ended - Focusing additionalRole input');
+            focusInput('additionalRole');
+            setWaitingForInput(true);
+            // Set timestamp for step 3 timeout
+            setPreviousData(prev => prev ? { ...prev, timestamp: Date.now() } : null);
+          } else if (step === 4) {
+            console.log('🎯 Step 4 ended - Focusing industryInput');
+            focusInput('industryInput');
+            setWaitingForInput(true);
           }
+        } else if (currentStep === 2) {
+          // Step 3 progressive audio focus logic
+          if (step === 1) {
+            console.log('🎯 Expertise step 1 ended - Focusing expertiseInput and waiting for input');
+            focusInput('expertiseInput');
+            setWaitingForInput(true);
+          }
+        }
+        
+        // Handle step 0 (intro) continuation for any step
+        if (step === 0) {
+          console.log('🎯 Step 0 ended, continuing to step 1 in 1 second');
+          setTimeout(() => {
+            console.log('⏰ Timeout triggered, continuing to step 1');
+            setAudioStep(1);
+            playProgressiveAudio(1);
+          }, 1000);
         }
 
         // Clean up audio object after successful completion
@@ -497,6 +615,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       } else {
         // Start progressive audio
         await startProgressiveAudio();
+        return;
+      }
+    }
+
+    // If this is step 3 and we're clicking the audio button, start progressive audio
+    if (currentStep === 2 && text === getStepAudioContent()) {
+      if (isProgressiveAudio) {
+        // Stop progressive audio
+        stopCurrentAudio();
+        return;
+      } else {
+        // Start progressive audio for step 3
+        await startProgressiveAudioStep3();
         return;
       }
     }
@@ -1109,7 +1240,13 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                     <span className="inline-block h-1 w-1 bg-purple-300 rounded-full animate-pulse delay-150"></span>
                   </div>
                   <span>
-                    Audio guide active - Step {audioStep + 1} of 5
+                    {currentStep === 1 ? (
+                      `Audio guide active - Step ${audioStep} of 5`
+                    ) : currentStep === 2 ? (
+                      audioStep === 0 ? 'Audio guide active - Introduction' : 'Audio guide active - Step 1 of 1'
+                    ) : (
+                      'Audio guide active'
+                    )}
                     {waitingForInput && (
                       <span className="ml-2 text-blue-600 font-medium">
                         {audioStep === 3 ? '(Optional - will continue in 5s)' : '(Waiting for input...)'}

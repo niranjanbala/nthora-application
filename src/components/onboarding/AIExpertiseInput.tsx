@@ -185,6 +185,7 @@ const AIExpertiseInput: React.FC<AIExpertiseInputProps> = ({
         
         <div className="relative">
           <textarea
+            id="expertiseInput"
             value={freeText}
             onChange={handleTextChange}
             placeholder={placeholder}
