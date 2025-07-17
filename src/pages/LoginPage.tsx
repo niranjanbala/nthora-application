@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, AlertCircle, Sparkle, ArrowRight, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -37,7 +37,7 @@ const LoginPage: React.FC = () => {
       } else {
         setError(result.error || 'Failed to send verification code');
       }
-    } catch (error) {
+    } catch {
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -66,14 +66,14 @@ const LoginPage: React.FC = () => {
           // User exists but no profile - redirect to onboarding
           navigate('/onboarding');
         }
-      } else {
-        setError(result.error || 'Invalid verification code');
+              } else {
+          setError(result.error || 'Invalid verification code');
+        }
+      } catch {
+        setError('An unexpected error occurred. Please try again.');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      setError('An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleResendCode = async () => {
@@ -86,7 +86,7 @@ const LoginPage: React.FC = () => {
       if (!result.success) {
         setError(result.error || 'Failed to resend verification code');
       }
-    } catch (error) {
+    } catch {
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -156,12 +156,14 @@ const LoginPage: React.FC = () => {
         </form>
 
         <div className="mt-6 text-center">
-          <Link
-            to="/join"
+          <a
+            href="https://nthora.com"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-accent-600 hover:text-accent-700 text-sm font-medium"
           >
             Need access? Request an invite →
-          </Link>
+          </a>
         </div>
       </motion.div>
     </>
@@ -269,13 +271,15 @@ const LoginPage: React.FC = () => {
           <p className="text-ink-light text-sm mb-4">
             N-th`ora is currently in closed beta. Access is by invitation only to ensure quality and trust within our network.
           </p>
-          <Link
-            to="/join"
+          <a
+            href="https://nthora.com"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center space-x-2 btn-ghost text-accent-600 px-4 py-2"
           >
             <span>Request Invite</span>
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </a>
         </motion.div>
 
         {/* Features */}
